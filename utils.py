@@ -2,11 +2,8 @@
 Script for bunch of useful functions for reweighting code.
 """
 
-
 import bilby
-import gwmemory
 import copy
-
 import numpy as np
 
 
@@ -16,6 +13,15 @@ def nfft(time_domain_strain, sampling_frequency):
         frequency_domain_strain[mode] = np.fft.rfft(time_domain_strain[mode])
         frequency_domain_strain[mode] /=sampling_frequency
     return frequency_domain_strain
+
+
+def ifft(frequency_domain_strain, sampling_frequency):
+    time_domain_strain = dict()
+    for mode in frequency_domain_strain:
+        time_domain_strain[mode] = np.fft.irfft(frequency_domain_strain[mode])
+        time_domain_strain[mode] *= sampling_frequency
+    
+    return time_domain_strain
 
 def nfft_and_time_shift(kwargs, series, shift, waveform):
     time_shift = kwargs.get('time_shift', 0.)
@@ -30,18 +36,19 @@ def nfft_and_time_shift(kwargs, series, shift, waveform):
 
 
 def get_alpha(roll_off, duration):
-    return roll_off/duration
+    return 2*roll_off/duration
 
 
 def apply_time_shift_frequency_domain(waveform, frequency_array, duration, shift):
     wf = copy.deepcopy(waveform)
+    #print('shift', shift)
     for mode in wf:
         wf[mode] = wf[mode] * np.exp(-2j * np.pi * (duration + shift) * frequency_array)
     return wf
 
 
 def wrap_at_maximum(waveform):
-    max_index = np.argmax(np.abs(waveform['plus'] - 1j * waveform['cross']))
+    max_index = np.argmax(np.real(waveform['plus'] - 1j * waveform['cross']))
     shift = len(waveform['plus'])- max_index
     waveform = wrap_by_n_indices(shift=shift, waveform=copy.deepcopy(waveform))
     return waveform, shift
