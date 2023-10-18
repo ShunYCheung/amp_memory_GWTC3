@@ -130,7 +130,8 @@ def osc_freq_XPHM(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2, ti
                 theta_jn=theta_jn, phi_jl=phi_jl, tilt_1=tilt_1, tilt_2=tilt_2,
                 phi_12=phi_12, a_1=a_1, a_2=a_2, mass_1=mass_1*SOLAR_MASS, mass_2=mass_2*SOLAR_MASS,
                 reference_frequency=reference_frequency, phase=phase)
-
+        print('iota', iota)
+        print('theta_jn', theta_jn)
         # Create a generator
         xphm = gwmemory.waveforms.Approximant(name='IMRPhenomXPHM', 
                                                 minimum_frequency=minimum_frequency,
@@ -140,10 +141,12 @@ def osc_freq_XPHM(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2, ti
                                                 total_mass=mass_1+mass_2, 
                                                 spin_1=[spin_1x, spin_1y, spin_1z], 
                                                 spin_2=[spin_2x, spin_2y, spin_2z], 
-                                                times=series.time_array)
+                                                times=series.time_array,
+                                                iota=iota,
+                                                phiRef=phase,)
         
         osc_bilby = waveform_generator.time_domain_strain(parameters = parameters)
-        osc_gw, xphm_times = xphm.time_domain_oscillatory(inc=iota, phase=phase)
+        osc_gw, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=0)
 
         
         _, shift = utils.wrap_at_maximum(osc_gw)
@@ -160,8 +163,15 @@ def osc_freq_XPHM(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2, ti
 
         waveform = {'plus': new_plus, 'cross': new_cross}
         waveform_fd = utils.nfft_and_time_shift(kwargs, series, new_shift, waveform)
-
+        #waveform_fd = utils.nfft(waveform, sampling_frequency)
+        plt.figure()
+        plt.loglog(frequencies, np.abs(waveform_fd['plus']+waveform_fd['cross']))
+        plt.xlim(15, 1000)
+        plt.ylim(1e-26, 1e-22)
+        plt.savefig('tests/check_end_gwmemory_osc_wf_fd.png')
+        
         return waveform_fd
+
 
 def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2, tilt_1, tilt_2, phi_12, phi_jl, theta_jn, phase, **kwargs):
     """
@@ -181,6 +191,9 @@ def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2,
     # define the time series based on the frequencies.
     series = bilby.core.series.CoupledTimeAndFrequencySeries(start_time=2-duration)
     series.frequency_array = frequencies
+    
+#     print('bilby frequency array, ', series.frequency_array)
+#     print('length of bilby frequency array: ', len(series.frequency_array))
 
     parameters = dict(mass_1=mass_1, mass_2=mass_2, luminosity_distance=luminosity_distance,
                      a_1=a_1, a_2=a_2, tilt_1=tilt_1, tilt_2=tilt_2, phi_12=phi_12, phi_jl=phi_jl, theta_jn=theta_jn, phase=phase)
@@ -201,13 +214,15 @@ def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2,
                                           total_mass=mass_1+mass_2, 
                                           spin_1=[spin_1x, spin_1y, spin_1z], 
                                           spin_2=[spin_2x, spin_2y, spin_2z], 
-                                          times=series.time_array)
+                                          times=series.time_array,
+                                          iota= iota,
+                                          phiRef=phase,)
 
     # call the time domain oscillatory and memory components. 
     osc = waveform_generator.frequency_domain_strain(parameters = parameters)
     osc_td = waveform_generator.time_domain_strain(parameters = parameters)
-    osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=iota, phase=phase)
-    mem, xphm_times = xphm.time_domain_memory(inc=iota, phase=phase)
+    osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=0)
+    mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=0)
     
     _, shift = utils.wrap_at_maximum(osc_ref)
     _, shift2 = utils.wrap_at_maximum(osc_td)
@@ -226,8 +241,10 @@ def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2,
     waveform_fd = utils.nfft_and_time_shift(kwargs, series, new_shift, waveform)
     for mode in waveform_fd:    # add the osc and mem waveforms together in the frequency domain.
         waveform_fd[mode] = waveform_fd[mode] + osc[mode]
-
+    
+    print('length of waveform array, ', len(waveform_fd['plus']))
     return waveform_fd
+
 
 def mem_freq_XPHM_only(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2, tilt_1, tilt_2, phi_12, phi_jl, theta_jn, phase, **kwargs):
         
@@ -252,13 +269,21 @@ def mem_freq_XPHM_only(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_
                 phi_12=phi_12, a_1=a_1, a_2=a_2, mass_1=mass_1*SOLAR_MASS, mass_2=mass_2*SOLAR_MASS,
                 reference_frequency=reference_frequency, phase=phase)
         
-        xphm = gwmemory.waveforms.Approximant(name='IMRPhenomXPHM', minimum_frequency=minimum_frequency, sampling_frequency=sampling_frequency, 
-                                               distance=luminosity_distance, q= mass_1/mass_2, total_mass=mass_1+mass_2, 
-                                                      spin_1=[spin_1x, spin_1y, spin_1z], spin_2=[spin_2x, spin_2y, spin_2z], times=series.time_array)
+        xphm = gwmemory.waveforms.Approximant(name='IMRPhenomXPHM', 
+                                              minimum_frequency=minimum_frequency, 
+                                              sampling_frequency=sampling_frequency, 
+                                              distance=luminosity_distance, 
+                                              q= mass_1/mass_2, 
+                                              total_mass=mass_1+mass_2, 
+                                              spin_1=[spin_1x, spin_1y, spin_1z], 
+                                              spin_2=[spin_2x, spin_2y, spin_2z], 
+                                              times=series.time_array,
+                                              iota = iota,
+                                              phiRef = phase)
         
-        osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=iota, phase=phase)
+        osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=0)
         osc_td = waveform_generator.time_domain_strain(parameters = parameters)
-        mem, xphm_times = xphm.time_domain_memory(inc=iota, phase=phase)
+        mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=0)
         _, shift = utils.wrap_at_maximum(osc_ref)
         _, shift2 = utils.wrap_at_maximum(osc_td)
         new_shift = shift - shift2
@@ -273,7 +298,7 @@ def mem_freq_XPHM_only(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_
         waveform = {'plus': new_plus, 'cross': new_cross}
 
         # perform nfft to obtain frequency domain strain
-        waveform_fd = utils.nfft_and_time_shift(kwargs, series, shift, waveform)
+        waveform_fd = utils.nfft_and_time_shift(kwargs, series, new_shift, waveform)
         
         return waveform_fd
 
@@ -310,6 +335,7 @@ def mem_freq_XHM(frequencies, mass_ratio, total_mass, luminosity_distance, spin_
 
         return waveform_fd
 
+
 def osc_freq_XHM(frequencies, mass_ratio, total_mass, luminosity_distance, spin_1x, spin_1y, spin_1z, spin_2x, spin_2y, spin_2z, 
                   iota, phase, **kwargs):
         
@@ -339,137 +365,5 @@ def osc_freq_XHM(frequencies, mass_ratio, total_mass, luminosity_distance, spin_
         waveform = {'plus': new_plus, 'cross': new_cross}
 
         waveform_fd = utils.nfft(waveform, sampling_frequency=sampling_frequency)
-
-        return waveform_fd
-
-def osc_test(frequencies, mass_ratio, total_mass, luminosity_distance, chi_1, chi_2,
-                  iota, phase, **kwargs):
-        
-        duration = kwargs.get('duration')
-        roll_off = kwargs.get('roll_off')
-        minimum_frequency = kwargs.get("minimum_frequency")
-        sampling_frequency = kwargs.get('sampling_frequency')
-
-        series = bilby.core.series.CoupledTimeAndFrequencySeries(start_time=0)
-        series.frequency_array = frequencies
-        
-        xhm = gwmemory.waveforms.Approximant(name='IMRPhenomXHM', minimum_frequency=minimum_frequency, 
-                                               distance=luminosity_distance, q= mass_ratio, total_mass=total_mass, 
-                                                      spin_1=[0, 0, chi_1], spin_2=[0, 0, chi_2], 
-                                                      times=series.time_array)
-        
-        osc, xhm_times = xhm.time_domain_oscillatory(inc=iota, phase=phase)
-        plus = osc['plus']
-        cross = osc['cross']
-
-        window = tukey(xhm_times.size, utils.get_alpha(roll_off, duration))
-
-        new_plus = plus * window
-        new_cross = cross * window
-
-        waveform = {'plus': new_plus, 'cross': new_cross}
-
-        _, shift = utils.wrap_at_maximum(waveform=osc)
-
-        waveform_fd = utils.nfft_and_time_shift(kwargs, series, shift, waveform)
-
-        return waveform_fd
-
-
-def mem_test(frequencies, mass_ratio, total_mass, luminosity_distance, chi_1, chi_2, 
-                  iota, phase,**kwargs):
-        
-        duration = kwargs.get('duration')
-        roll_off = kwargs.get('roll_off')
-        minimum_frequency = kwargs.get("minimum_frequency")
-        sampling_frequency = kwargs.get('sampling_frequency')
-        series = bilby.core.series.CoupledTimeAndFrequencySeries(start_time=0)
-        series.frequency_array = frequencies
-        
-        xhm = gwmemory.waveforms.Approximant(name='IMRPhenomXHM', minimum_frequency=minimum_frequency, 
-                                               distance=luminosity_distance, q= mass_ratio, total_mass=total_mass, 
-                                                      spin_1=[0, 0, chi_1], spin_2=[0, 0, chi_2], times=series.time_array)
-        
-        osc, xhm_times = xhm.time_domain_oscillatory(inc=iota, phase=phase)
-        mem, xhm_times = xhm.time_domain_memory(inc=iota, phase=phase)          # no gamma_lmlm argument is needed, as it is deprecated.
-        plus = osc['plus'] + mem['plus']
-        cross = osc['cross'] + mem['cross']
-
-        window = tukey(xhm_times.size, utils.get_alpha(roll_off, duration))
-
-        new_plus = plus * window
-        new_cross = cross * window
-
-        waveform = {'plus': new_plus, 'cross': new_cross}
-
-        _, shift = utils.wrap_at_maximum(waveform=osc)
-
-        waveform_fd = utils.nfft_and_time_shift(kwargs, series, shift, waveform)
-
-        return waveform_fd
-
-def osc_test2(frequencies, mass_ratio, total_mass, luminosity_distance, chi_1, chi_2,
-                  iota, phase, **kwargs):
-        
-        duration = kwargs.get('duration')
-        roll_off = kwargs.get('roll_off')
-        minimum_frequency = kwargs.get("minimum_frequency")
-        sampling_frequency = kwargs.get('sampling_frequency')
-
-        series = bilby.core.series.CoupledTimeAndFrequencySeries(start_time=0)
-        series.frequency_array = frequencies
-        
-        xhm = gwmemory.waveforms.Approximant(name='IMRPhenomXHM', minimum_frequency=minimum_frequency, 
-                                               distance=luminosity_distance, q= mass_ratio, total_mass=total_mass, 
-                                                      spin_1=[0, 0, chi_1], spin_2=[0, 0, chi_2], 
-                                                      times=series.time_array)
-        
-        osc, xhm_times = xhm.time_domain_oscillatory(inc=iota, phase=phase)
-        plus = osc['plus']
-        cross = osc['cross']
-
-        window = tukey(xhm_times.size, utils.get_alpha(roll_off, duration))
-
-        new_plus = plus * window
-        new_cross = cross * window
-
-        waveform = {'plus': new_plus, 'cross': new_cross}
-
-        #_, shift = utils.wrap_at_maximum(waveform=osc)
-
-        waveform_fd = utils.nfft(waveform, sampling_frequency)
-
-        return waveform_fd
-
-
-def mem_test2(frequencies, mass_ratio, total_mass, luminosity_distance, chi_1, chi_2, 
-                  iota, phase,**kwargs):
-        
-        duration = kwargs.get('duration')
-        roll_off = kwargs.get('roll_off')
-        minimum_frequency = kwargs.get("minimum_frequency")
-        sampling_frequency = kwargs.get('sampling_frequency')
-        series = bilby.core.series.CoupledTimeAndFrequencySeries(start_time=0)
-        series.frequency_array = frequencies
-        
-        xhm = gwmemory.waveforms.Approximant(name='IMRPhenomXHM', minimum_frequency=minimum_frequency, 
-                                               distance=luminosity_distance, q= mass_ratio, total_mass=total_mass, 
-                                                      spin_1=[0, 0, chi_1], spin_2=[0, 0, chi_2], times=series.time_array)
-        
-        osc, xhm_times = xhm.time_domain_oscillatory(inc=iota, phase=phase)
-        mem, xhm_times = xhm.time_domain_memory(inc=iota, phase=phase)          # no gamma_lmlm argument is needed, as it is deprecated.
-        plus = osc['plus'] + mem['plus']
-        cross = osc['cross'] + mem['cross']
-
-        window = tukey(xhm_times.size, utils.get_alpha(roll_off, duration))
-
-        new_plus = plus * window
-        new_cross = cross * window
-
-        waveform = {'plus': new_plus, 'cross': new_cross}
-
-        #_, shift = utils.wrap_at_maximum(waveform=osc)
-
-        waveform_fd = utils.nfft(waveform, sampling_frequency)
 
         return waveform_fd

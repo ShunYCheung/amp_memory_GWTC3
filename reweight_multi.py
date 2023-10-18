@@ -1,5 +1,6 @@
 from reweight_mem_parallel import reweight_mem_parallel
 from create_post_dict import create_post_dict, extract_relevant_info, process_bilby_result
+from event_table import call_event_table
 
 import json
 import bilby
@@ -7,14 +8,14 @@ import sys
 import os
 
 
-#event_number = int(sys.argv[1])
-amplitude = float(sys.argv[1])
+event_number = int(sys.argv[1])
+amplitude = float(sys.argv[2])
 print(amplitude)
 
 
 if __name__ == '__main__':
-    events = [('GW150914', '/home/shunyin.cheung/GWOSC_posteriors/IGWN-GWTC2p1-v2-GW150914_095045_PEDataRelease_mixed_cosmo.h5', 1126259462.4, 4.0, "C01:IMRPhenomXPHM", None)]
-    #events = [("edge_on_GW150914", "injection/max_mem_GW150914_v6/final_result/label_data0_0_analysis_H1L1_merge_result.hdf5", 1126259462.4, ['L1', 'H1'], 4.0)]
+    events = [call_event_table()[event_number]]
+    #events = [('GW150914', '/home/shunyin.cheung/GWOSC_posteriors/IGWN-GWTC2p1-v2-GW150914_095045_PEDataRelease_mixed_cosmo.h5', 1126259462.4, 4.0, "C01:IMRPhenomXPHM", None)]
     
     for count, i in enumerate(events):
         event_name, file_path, trigger_time, duration, waveform, data_file = i
@@ -45,7 +46,7 @@ if __name__ == '__main__':
                                             data_file=data_file,
                                             psds = psds,
                                             calibration = None,
-                                            n_parallel=4)
+                                            n_parallel=8)
         
         
 

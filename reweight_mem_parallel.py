@@ -202,13 +202,13 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     
     
     # save weights, proposal and target likelihoods into a .txt file
-    np.savetxt(out_folder+"/{0}_{1}_a={2}.csv".format(outfile_name_w, waveform_name, amplitude), 
+    np.savetxt(out_folder+"/{0}_a={1}_{2}.csv".format(outfile_name_w, amplitude, waveform_name), 
                weights_list, 
                delimiter=",")
-    np.savetxt(out_folder+"/{0}_{1}_a={2}_proposal_likelihood.csv".format(outfile_name_w, waveform_name, amplitude), 
+    np.savetxt(out_folder+"/{0}_a={1}_{2}_proposal_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
                proposal_likelihood_list, 
                delimiter=",")
-    np.savetxt(out_folder+"/{0}_{1}_a={2}_target_likelihood.csv".format(outfile_name_w, waveform_name, amplitude), 
+    np.savetxt(out_folder+"/{0}_a={1}_{2}_target_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
                target_likelihood_list, 
                delimiter=",")
 
