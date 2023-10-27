@@ -163,7 +163,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_osc,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = "'TD.npz'.npz",
+        distance_marginalization_lookup_table = args['distance_marginalization_lookup_table'],
         jitter_time=jitter_time,
         priors = priors,
         reference_frame = args['reference_frame'],
@@ -175,7 +175,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_full,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = "'TD.npz'.npz",
+        distance_marginalization_lookup_table = args['distance_marginalization_lookup_table'],
         jitter_time=jitter_time,
         priors = priors2,
         reference_frame = args['reference_frame'],
@@ -230,6 +230,14 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors):
     length = data.shape[0]
     
     for i in range(length):
+
+        posterior = data.iloc[i].to_dict()
+
+        # make sures the values are float and not complex.
+        if np.iscomplexobj(posterior['mass_2']):
+            for keys in posterior:
+                posterior[keys] = float(np.real(posterior[keys]))
+
         use_stored_likelihood=False
         
         if i % 1000 == 0:
@@ -240,11 +248,11 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors):
             proposal_likelihood_values = data['log_likelihood'].iloc[i]
             
         else:
-            proposal_likelihood.parameters.update(data.iloc[i].to_dict())
+            proposal_likelihood.parameters.update(posterior)
             proposal_likelihood.parameters.update(reference_dict)
             proposal_likelihood_values = proposal_likelihood.log_likelihood_ratio()
             
-        target_likelihood.parameters.update(data.iloc[i].to_dict())
+        target_likelihood.parameters.update(posterior)
         target_likelihood.parameters.update(reference_dict)
         target_likelihood_values = target_likelihood.log_likelihood_ratio()
         
