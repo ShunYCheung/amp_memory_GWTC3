@@ -215,14 +215,16 @@ def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2,
                                           spin_1=[spin_1x, spin_1y, spin_1z], 
                                           spin_2=[spin_2x, spin_2y, spin_2z], 
                                           times=series.time_array,
-                                          iota= iota,
-                                          phiRef=phase,)
+                                        #   iota= iota,
+                                        #   phiRef=phase,
+                                          )
+    
 
     # call the time domain oscillatory and memory components. 
     osc = waveform_generator.frequency_domain_strain(parameters = parameters)
     osc_td = waveform_generator.time_domain_strain(parameters = parameters)
-    osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=0)
-    mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=0)
+    osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=phase)
+    mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=phase)
     
     _, shift = utils.wrap_at_maximum(osc_ref)
     _, shift2 = utils.wrap_at_maximum(osc_td)
@@ -242,7 +244,6 @@ def mem_freq_XPHM_v2(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_2,
     for mode in waveform_fd:    # add the osc and mem waveforms together in the frequency domain.
         waveform_fd[mode] = waveform_fd[mode] + osc[mode]
     
-    print('length of waveform array, ', len(waveform_fd['plus']))
     return waveform_fd
 
 
@@ -278,12 +279,13 @@ def mem_freq_XPHM_only(frequencies, mass_1, mass_2, luminosity_distance, a_1, a_
                                               spin_1=[spin_1x, spin_1y, spin_1z], 
                                               spin_2=[spin_2x, spin_2y, spin_2z], 
                                               times=series.time_array,
-                                              iota = iota,
-                                              phiRef = phase)
+                                        #       iota = iota,
+                                        #       phiRef = phase
+                                              )
         
-        osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=0)
+        osc_ref, xphm_times = xphm.time_domain_oscillatory(inc=theta_jn, phase=phase)
         osc_td = waveform_generator.time_domain_strain(parameters = parameters)
-        mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=0)
+        mem, xphm_times = xphm.time_domain_memory(inc=theta_jn, phase=phase)
         _, shift = utils.wrap_at_maximum(osc_ref)
         _, shift2 = utils.wrap_at_maximum(osc_td)
         new_shift = shift - shift2
