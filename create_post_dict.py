@@ -5,6 +5,8 @@ from bilby.core.prior import Prior, PriorDict, DeltaFunction, ConditionalDeltaFu
 import json
 import ast
 import numpy as np
+import os
+import sys
 
 
 def create_post_dict(file_name, waveform):
@@ -194,7 +196,7 @@ def extract_relevant_info(meta, config):
         if string[0:2] == '{ ':
             string = string[2:]
         if string[-1] == '}':
-            string = string[:-2]
+            string = string[:-1]
         for sub in string.split(','):
             for i in range(len(sub)):
                 if sub[i] == ' ':
@@ -217,8 +219,16 @@ def extract_relevant_info(meta, config):
         path_TD += outdir_split[i]
         path_TD += '/'
 
-    path_TD += TD_name
+    if os.path.isfile(path_TD + TD_name):
+        lookup_table_path = path_TD + TD_name
+    elif os.path.isfile(path_TD + "'TD.npz'.npz"):
+        lookup_table_path = path_TD + "'TD.npz'.npz"
+    else:
+        print('Error: Unable to find distance marginalization lookup table')
+        lookup_table_path = None
     
+
+
     # combine all into a dict
     args = dict(duration=duration,
                sampling_frequency=sampling_frequency,
@@ -238,7 +248,7 @@ def extract_relevant_info(meta, config):
                time_reference=time_reference,
                jitter_time=jitter_time,
                channel_dict=channel_dict,
-               distance_marginalization_lookup_table = path_TD)
+               distance_marginalization_lookup_table = lookup_table_path)
     return args
 
 

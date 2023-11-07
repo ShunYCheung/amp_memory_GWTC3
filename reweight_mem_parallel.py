@@ -48,13 +48,18 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         print("opening {}".format(data_file))
         with open(data_file, 'rb') as f:
             data_dump = pickle.load(f)
-        ifo_list = data_dump.interferometers
+        try:
+            ifo_list = data_dump.interferometers
+
+        except AttributeError:
+            ifo_list = data_dump['ifo_list']
+
         sampling_frequency = ifo_list.sampling_frequency
         maximum_frequency = args['maximum_frequency']
         minimum_frequency = args['minimum_frequency']
         reference_frequency = args['reference_frequency']
         roll_off = args['tukey_roll_off']
-        duration = ifo_list.duration
+        duration = args['duration']
     else:
         sampling_frequency = args['sampling_frequency']
         maximum_frequency = args['maximum_frequency']
@@ -163,7 +168,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_osc,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = args['distance_marginalization_lookup_table'],
+        distance_marginalization_lookup_table = 'TD.npz',
         jitter_time=jitter_time,
         priors = priors,
         reference_frame = args['reference_frame'],
@@ -175,7 +180,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_full,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = args['distance_marginalization_lookup_table'],
+        distance_marginalization_lookup_table = 'TD.npz',
         jitter_time=jitter_time,
         priors = priors2,
         reference_frame = args['reference_frame'],

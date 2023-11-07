@@ -126,24 +126,51 @@ def make_results(event_name):
     memory_amp = memory_snr_table[:,0]
     memory_snr = memory_snr_table[:,1]
 
-    fig, ax1 = plt.subplots(figsize=(9, 6))
-    ax2 = ax1.twinx() 
-    plt.title('{}'.format(event_name))
-    lns1 = ax1.plot(s_labels, s_bf_list, label='BF')
-    lns2 = ax2.plot(memory_amp, memory_snr, label='memory SNR', color='orange')
-    ax1.set_xlabel('A')
-    ax1.set_ylabel('BF')
-    ax1.set_xlim(0, np.max(s_labels))
-    ax2.set_ylabel('optimal SNR')
+    # fig, ax1 = plt.subplots(figsize=(9, 6))
+    # ax2 = ax1.twinx() 
+    # plt.title('{}'.format(event_name))
+    # lns1 = ax1.plot(s_labels, s_bf_list, label='BF')
+    # lns2 = ax2.plot(memory_amp, memory_snr, label='memory SNR', color='orange')
+    # ax1.set_xlabel('A')
+    # ax1.set_ylabel('BF')
+    # ax1.set_xlim(0, np.max(s_labels))
+    # ax2.set_ylabel('optimal SNR')
 
-    lns = lns1+lns2
-    labs = [l.get_label() for l in lns]
-    ax1.legend(lns, labs, loc=0)
+    # lns = lns1+lns2
+    # labs = [l.get_label() for l in lns]
+    # ax1.legend(lns, labs, loc=0)
 
-    plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
-    plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
+    # plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
+    # plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
 
-    fig, axs = plt.subplots(3, figsize=(9, 6))
+    # fig, axs = plt.subplots(3, figsize=(9, 6))
+    # axs[0].plot(s_labels, s_bf_list)
+    # axs[0].set_title('{}'.format(event_name))
+    # axs[0].set_ylabel('Bayes factor')
+    # axs[1].plot(memory_amp, memory_snr)
+    # axs[1].set_ylabel('memory SNR')
+    # axs[2].plot(s_labels, s_eff_list)
+    # axs[2].set_ylabel('efficiency (%)')
+    # axs[2].set_xlabel('amplitude')
+    # axs[0].label_outer()
+    # axs[1].label_outer()
+    # axs[2].label_outer()
+    # axs[0].set_ylim(0, np.max(s_bf_list))
+    # axs[1].set_ylim(0, np.max(memory_snr))
+    # axs[2].set_ylim(0, np.max(s_eff_list))
+    # for ax in axs:
+    #     ax.set_xlim(0, np.max(s_labels))
+
+    # print(event_name)
+    # plt.savefig(f'results/{event_name}/{event_name}_three_metric_plot.png')
+
+    log_like_data = np.genfromtxt(f'results/{event_name}/{event_name}_log_like_ratio_vs_amp_highest_posterior.csv')
+
+    l_like = log_like_data[:, 1]
+    l_amp = log_like_data[:, 0]
+
+
+    fig, axs = plt.subplots(4, figsize=(9, 8))
     axs[0].plot(s_labels, s_bf_list)
     axs[0].set_title('{}'.format(event_name))
     axs[0].set_ylabel('Bayes factor')
@@ -152,17 +179,24 @@ def make_results(event_name):
     axs[2].plot(s_labels, s_eff_list)
     axs[2].set_ylabel('efficiency (%)')
     axs[2].set_xlabel('amplitude')
+    axs[3].plot(l_amp, l_like)
+    axs[3].set_ylabel('ln L ratio')
+    axs[3].set_xlabel('amplitude')
     axs[0].label_outer()
     axs[1].label_outer()
     axs[2].label_outer()
+    axs[3].label_outer()
     axs[0].set_ylim(0, np.max(s_bf_list))
     axs[1].set_ylim(0, np.max(memory_snr))
     axs[2].set_ylim(0, np.max(s_eff_list))
+    axs[3].set_ylim(np.min(l_like[l_amp<np.max(s_labels)]), np.max(l_like))
     for ax in axs:
         ax.set_xlim(0, np.max(s_labels))
 
     print(event_name)
-    plt.savefig(f'results/{event_name}/{event_name}_three_metric_plot.png')
+    plt.savefig(f'results/{event_name}/{event_name}_four_metric_plot.png')
+
+
     return None
 
 
@@ -182,10 +216,22 @@ def combine_posteriors(event_list):
             if amp in amplitudes:
                 combined_bf[np.where(amplitudes==amp)] *= data[i,1]
         count += 1
+        if len(data[:, 0]) < len(amplitudes):
+            print('missing data points', event)
 
     
     print('Total number of events combined = ', count)
     
+    plt.figure()
+    plt.fill_between(amplitudes, combined_bf, color='cornflowerblue', alpha=0.5)
+    plt.xlabel(f'A', fontsize=18)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.xlim(0, 4)
+    plt.tight_layout()
+    plt.savefig(f'results/combined_amplitude_posterior_test.pdf')
+    plt.savefig(f'results/combined_amplitude_posterior_test.png')
+
     bf_int = sp.interpolate.interp1d(amplitudes, combined_bf)
 
     new_amp = np.linspace(np.min(amplitudes), np.max(amplitudes), 1000)
@@ -220,8 +266,7 @@ def combine_posteriors(event_list):
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.xlim(0, np.max(new_amp))
-    plt.ylim(0, np.max(prob))
-    plt.legend()
+    plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
     plt.savefig(f'results/combined_amplitude_posterior.pdf')
     plt.savefig(f'results/combined_amplitude_posterior.png')
@@ -232,19 +277,16 @@ def combine_posteriors(event_list):
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
     plt.xlim(0, 4)
-    plt.ylim(0, np.max(prob))
-    plt.legend()
+    plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
     plt.savefig(f'results/combined_amplitude_posterior_low_amp.pdf')
     plt.savefig(f'results/combined_amplitude_posterior_low_amp.png')
 
     
-    
-
-
-
-for i, event in enumerate(event_label[0:1]):
+#events_wanted = np.array(['GW170104','GW170729','GW190413_052954', 'GW190426_190642', 'GW190521', 'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191204_171526', 'GW200128', 'GW200129', 'GW200202'])
+events_wanted = np.array(['GW170818'])
+for i, event in enumerate(events_wanted):
     print(f'Event no. {i}')
     make_results(event)
 
-combine_posteriors(event_label)
+# combine_posteriors(event_label)

@@ -40,13 +40,13 @@ if __name__ == '__main__':
                                             samples_dict, 
                                             args,
                                             priors_dict,
-                                            "/home/shunyin.cheung/amp_memory_GWTC3/run2",
+                                            "/home/shunyin.cheung/amp_memory_GWTC3/run2/{}".format(event_name),
                                             "weights_{}".format(event_name), 
                                             amplitude = amplitude,
                                             data_file=data_file,
                                             psds = psds,
                                             calibration = None,
-                                            n_parallel=8)
+                                            n_parallel=16)
         
         
 
