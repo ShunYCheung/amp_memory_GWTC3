@@ -204,7 +204,6 @@ def extract_relevant_info(meta, config):
             if ':' in sub:
                     res.append(map(str.strip, sub.split(':', 1)))
         channel_dict = dict(res)
-        print('channel_dict', channel_dict)
     else:
         print('Unable to extract channel dict.')
 
@@ -213,7 +212,6 @@ def extract_relevant_info(meta, config):
     TD_name = config['distance-marginalization-lookup-table'][0]
 
     outdir_split = outdir.split('/')
-    print(outdir_split)
     path_TD = ''
     for i in range(len(outdir_split)-1):
         path_TD += outdir_split[i]

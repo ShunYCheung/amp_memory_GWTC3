@@ -13,6 +13,7 @@ event_label = ['GW150914', 'GW151012', 'GW151226', 'GW170104', 'GW170608', 'GW17
 
 
 def make_results(event_name):
+    print(event_name)
     path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/run2/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
     
     s_path_list = sorted(path_list)
@@ -72,12 +73,12 @@ def make_results(event_name):
     t_contours = f(np.array(probslevels))
     contour = t_contours[0]
     idx = np.argwhere(np.diff(np.sign(prob - contour))).flatten()
-    print(idx)
-    if len(idx) < 2:
-        idx = np.append(idx, [0])
-    elif len(idx) > 2:
-        print('Error: credible interval has more than two values.')
-        exit()
+    # print(idx)
+    # if len(idx) < 2:
+    #     idx = np.append(idx, [0])
+    # elif len(idx) > 2:
+    #     print('Error: credible interval has more than two values.')
+    #     exit()
     
     ci90 = sorted(new_amp[idx])
     print('90 percent credible interval', ci90)
@@ -143,7 +144,39 @@ def make_results(event_name):
     # plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
     # plt.savefig(f'results/{event_name}/{event_name}_memory_snr_vs_amp.png')
 
-    # fig, axs = plt.subplots(3, figsize=(9, 6))
+    m = (memory_snr[-1]-memory_snr[0])/(memory_amp[-1]-memory_amp[0])
+    c = memory_snr[0]
+    x = np.linspace(0, np.max(s_labels), 1000)
+    y = m*x+c
+
+    fig, axs = plt.subplots(3, figsize=(9, 6))
+    axs[0].plot(s_labels, s_bf_list)
+    axs[0].set_title('{}'.format(event_name))
+    axs[0].set_ylabel('Bayes factor')
+    #axs[1].plot(memory_amp, memory_snr)
+    axs[1].plot(x, y)
+    axs[1].set_ylabel('memory SNR')
+    axs[2].plot(s_labels, s_eff_list)
+    axs[2].set_ylabel('efficiency (%)')
+    axs[2].set_xlabel('amplitude')
+    axs[0].label_outer()
+    axs[1].label_outer()
+    axs[2].label_outer()
+    axs[0].set_ylim(0, np.max(s_bf_list)+0.05*np.max(s_bf_list))
+    axs[1].set_ylim(0, np.max(y))
+    axs[2].set_ylim(0, np.max(s_eff_list))
+    for ax in axs:
+        ax.set_xlim(0, np.max(s_labels))
+
+    plt.savefig(f'results/{event_name}/{event_name}_three_metric_plot.png')
+
+    # log_like_data = np.genfromtxt(f'results/{event_name}/{event_name}_log_like_ratio_vs_amp_highest_posterior.csv')
+
+    # l_like = log_like_data[:, 1]
+    # l_amp = log_like_data[:, 0]
+
+
+    # fig, axs = plt.subplots(4, figsize=(9, 8))
     # axs[0].plot(s_labels, s_bf_list)
     # axs[0].set_title('{}'.format(event_name))
     # axs[0].set_ylabel('Bayes factor')
@@ -152,51 +185,22 @@ def make_results(event_name):
     # axs[2].plot(s_labels, s_eff_list)
     # axs[2].set_ylabel('efficiency (%)')
     # axs[2].set_xlabel('amplitude')
+    # axs[3].plot(l_amp, l_like)
+    # axs[3].set_ylabel('ln L ratio')
+    # axs[3].set_xlabel('amplitude')
     # axs[0].label_outer()
     # axs[1].label_outer()
     # axs[2].label_outer()
+    # axs[3].label_outer()
     # axs[0].set_ylim(0, np.max(s_bf_list))
     # axs[1].set_ylim(0, np.max(memory_snr))
     # axs[2].set_ylim(0, np.max(s_eff_list))
+    # axs[3].set_ylim(np.min(l_like[l_amp<np.max(s_labels)]), np.max(l_like))
     # for ax in axs:
     #     ax.set_xlim(0, np.max(s_labels))
 
     # print(event_name)
-    # plt.savefig(f'results/{event_name}/{event_name}_three_metric_plot.png')
-
-    log_like_data = np.genfromtxt(f'results/{event_name}/{event_name}_log_like_ratio_vs_amp_highest_posterior.csv')
-
-    l_like = log_like_data[:, 1]
-    l_amp = log_like_data[:, 0]
-
-
-    fig, axs = plt.subplots(4, figsize=(9, 8))
-    axs[0].plot(s_labels, s_bf_list)
-    axs[0].set_title('{}'.format(event_name))
-    axs[0].set_ylabel('Bayes factor')
-    axs[1].plot(memory_amp, memory_snr)
-    axs[1].set_ylabel('memory SNR')
-    axs[2].plot(s_labels, s_eff_list)
-    axs[2].set_ylabel('efficiency (%)')
-    axs[2].set_xlabel('amplitude')
-    axs[3].plot(l_amp, l_like)
-    axs[3].set_ylabel('ln L ratio')
-    axs[3].set_xlabel('amplitude')
-    axs[0].label_outer()
-    axs[1].label_outer()
-    axs[2].label_outer()
-    axs[3].label_outer()
-    axs[0].set_ylim(0, np.max(s_bf_list))
-    axs[1].set_ylim(0, np.max(memory_snr))
-    axs[2].set_ylim(0, np.max(s_eff_list))
-    axs[3].set_ylim(np.min(l_like[l_amp<np.max(s_labels)]), np.max(l_like))
-    for ax in axs:
-        ax.set_xlim(0, np.max(s_labels))
-
-    print(event_name)
-    plt.savefig(f'results/{event_name}/{event_name}_four_metric_plot.png')
-
-
+    # plt.savefig(f'results/{event_name}/{event_name}_four_metric_plot.png')
     return None
 
 
@@ -284,9 +288,9 @@ def combine_posteriors(event_list):
 
     
 #events_wanted = np.array(['GW170104','GW170729','GW190413_052954', 'GW190426_190642', 'GW190521', 'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191204_171526', 'GW200128', 'GW200129', 'GW200202'])
-events_wanted = np.array(['GW170818'])
-for i, event in enumerate(events_wanted):
-    print(f'Event no. {i}')
+# events_wanted = np.array(['GW190602'])
+for i, event in enumerate(event_label[68:]):
+    print(f'Event no. {i + 1}')
     make_results(event)
 
 # combine_posteriors(event_label)

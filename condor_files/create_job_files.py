@@ -5,13 +5,18 @@ Makes the .sh, .sub and .dag files to run reweighting.
 import os
 import numpy as np
 
+import sys
+sys.path.append("..")
+
+from event_table import call_event_table
+
 analysis_template = """universe = vanilla 
 executable = {log_dir}/condor_files/sh_files/{label}_amp{amp}.sh
 log = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.log
 error = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.err
 output = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.out
 
-request_cpus = 16
+request_cpus = {cpus}
 request_disk = 8000
 
 should_transfer_files = Yes
@@ -27,8 +32,9 @@ queue 1
 
 def make_sh_files(args, sh_filename):
     number = args['number']
+    cpus = args['cpus']
     bash_str = f"""#!/bin/bash
-python /home/shunyin.cheung/amp_memory_GWTC3/reweight_multi.py {number} {amp}
+python /home/shunyin.cheung/amp_memory_GWTC3/reweight_multi.py {cpus} {number} {amp}
     """
     with open(sh_filename, 'w') as ff:
         ff.write(bash_str)
@@ -56,29 +62,36 @@ def make_dag_files(args, dag_filename):
 
 ###################################
 
-events = np.array(['GW150914', 'GW151012', 'GW151226', 'GW170104', 'GW170608', 'GW170729', 'GW170809', 'GW170814', 'GW170818', 'GW170823', 'GW190403', 'GW190408', 'GW190412', 'GW190413_134308', 'GW190413_052954', 'GW190421', 'GW190426_190642', 'GW190503', 'GW190512', 'GW190513', 'GW190514', 'GW190517', 'GW190519', 'GW190521', 'GW190521_074359', 'GW190527', 'GW190602', 'GW190620', 'GW190630', 'GW190701', 'GW190706', 'GW190707', 'GW190708', 'GW190719', 'GW190720', 'GW190725', 'GW190727', 'GW190728', 'GW190731', 'GW190803', 'GW190805', 'GW190814', 'GW190828_065509', 'GW190828_063405', 'GW190910', 'GW190915', 'GW190916', 'GW190917', 'GW190924', 'GW190925', 'GW190926', 
-                   'GW190929', 'GW190930', 'GW191103', 'GW191105', 'GW191109', 'GW191113', 'GW191126', 'GW191127', 'GW191129', 'GW191204_171526', 'GW191204_110529', 'GW191215', 'GW191216', 'GW191219', 'GW191222', 'GW191230', 'GW200105', 'GW200112', 'GW200115', 'GW200128', 'GW200129', 'GW200202', 'GW200208_222617', 'GW200208_130117', 'GW200209', 'GW200210', 'GW200216', 'GW200219', 'GW200220_124850', 'GW200220_061928', 'GW200224', 'GW200225', 'GW200302', 'GW200306', 'GW200308', 'GW200311_115853', 'GW200316', 'GW200322'])
+event_table = call_event_table()
 
-events_done = np.array(['GW150914', 'GW170818','GW190412','GW190421','GW190521_074359', 'GW190630',  'GW190828_065509', 'GW200129', 'GW200224', 'GW200302' , 'GW200316'])
+events_wanted = np.array(['GW170104', 'GW170818', 'GW170729', 'GW190413_052954', 'GW190426_190462', 'GW190521', 
+                          'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191127', 'GW191204_171526', 
+                          'GW200128', 'GW200129', 'GW200202', 'GW190728', 'GW190924'])
 
 
 events_remaining = []
-for event in events:
-    if event not in events_done:
-        events_remaining.append(event)
+event_number = []
+
+for event_num, event in enumerate(event_table):
+    event_name, file_path, trigger_time, durations, waveform, data =event
+    if event_name not in events_wanted:
+        events_remaining.append(event_name)
+        event_number.append(event_num)
+
 
 print('events remaining', events_remaining)
 print('no. of remaining events', len(events_remaining))
 
-amplitude = [0.0625, 0.125, 0.25, 0.5, 2, 4, 8, 16, 32, 64, 100, 128]
+amplitude = [200, 300, 400, 500, 600, 700, 800, 900, 1000]
 
 
-for i, amp in enumerate(amplitude):
-    for j, label in enumerate(events):
+for amp in amplitude:
+    for j, label in enumerate(events_remaining):
         args = dict(log_dir = "/home/shunyin.cheung/amp_memory_GWTC3",
                 label = label,
-                number = j,
+                number = event_number[j],
                 amp = amp,
+                cpus = 4,
         ) 
         sh_filename = args['log_dir'] + "/condor_files/sh_files/" + args['label'] + "_amp" + str(args['amp']) + ".sh"
         submit_filename = args['log_dir'] + "/condor_files/sub_files/" + args['label'] + "_amp" + str(args['amp']) + ".sub"
@@ -86,7 +99,7 @@ for i, amp in enumerate(amplitude):
         make_sh_files(args, sh_filename)
 
 condor_dir = "/home/shunyin.cheung/amp_memory_GWTC3/condor_files/sub_files"
-dag_filename = args['log_dir'] + "/condor_files/reweight_remaining.submit"
+dag_filename = args['log_dir'] + "/condor_files/extend_remaining_a1100.submit"
 make_dag_files(args, dag_filename)
 
     

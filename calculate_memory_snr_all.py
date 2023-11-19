@@ -77,19 +77,22 @@ def call_data_GWOSC(logger, args, calibration, samples, detectors, start_time, e
 
 event_list = call_event_table()
 
-events_done = np.array(['GW150914', 'GW151012', 'GW151226', 'GW170104','GW170818','GW190412','GW190421','GW190521_074359', 'GW190630', 'GW190725', 'GW190814',  'GW190828_065509', 'GW190917', 'GW200129', 'GW200224', 'GW200302' , 'GW200316'])
+# events_wanted = np.array(['GW170818'])
+
+# events_remaining = []
+# event_number = []
+
+# for event in event_list:
+#     event_name, file_path, trigger_time, durations, waveform, data =event
+#     if event_name in events_wanted:
+#         events_remaining.append(event)
 
 
-events_remaining = []
-for event in event_list:
-    event_name, file_path, trigger_time, durations, waveform, data =event
-    if event_name not in events_done:
-        events_remaining.append(event)
 
 # print('events remaining', events_remaining)
 # print('no. of remaining events', len(events_remaining))
 
-for ele in events_remaining[54:55]:
+for ele in event_list:
     event_name, file_path, trigger_time, durations, waveform, data_file =ele
     print('event: ', event_name)
     print('file open', file_path)
@@ -182,7 +185,7 @@ for ele in events_remaining[54:55]:
 
     event_snr = []
 
-    amplitudes = [0.0625, 0.125, 0.25, 0.5, 1, 2, 4, 8, 16, 32, 64, 100, 128]
+    amplitudes = [0.0625, 1, 4, 8, 16, 32, 64, 100, 128, 1000, 1600, 2200]
 
     for amplitude in amplitudes:
         print('amplitude = ',amplitude)
@@ -230,9 +233,12 @@ for ele in events_remaining[54:55]:
             reference_frame = args['reference_frame'],
             time_reference = args['time_reference'],
         )
+        print('1')
 
         frequency_domain_strain = waveform_generator_mem.frequency_domain_strain(posterior)
+        print('2')
         target_likelihood.parameters.update(posterior)
+        print('3')
         print(len(ifo_list))
         if len(ifo_list) == 2:
             snr_array_H1 = target_likelihood.calculate_snrs(frequency_domain_strain, ifo_list[0])

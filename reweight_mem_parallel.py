@@ -98,7 +98,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     
     waveform_name = args['waveform_approximant']
     
-
+    print('waveform used: ', waveform_name)
     # test if bilby oscillatory waveform = gwmemory oscillatory waveform.
     waveform_generator_osc = bilby.gw.waveform_generator.WaveformGenerator(
         duration=duration,
