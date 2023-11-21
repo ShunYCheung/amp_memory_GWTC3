@@ -18,7 +18,8 @@ minimum-frequency=20
 maximum-frequency=1024
 reference-frequency = 20
 tukey-roll-off=0.4
-resampling-method=lal
+
+psd-dict={{H1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/H1_psd_run{injection_number}.dat,L1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/L1_psd_run{injection_number}.dat}}
 
 coherence-test = False
 

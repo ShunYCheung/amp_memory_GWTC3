@@ -7,8 +7,11 @@ import matplotlib.pyplot as plt
 import sys
 sys.path.append("..")
 
+import os
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
 from event_table import call_event_table
-from waveforms import mem_freq_XPHM_v2
+from waveforms import mem_freq_XPHM
 from create_post_dict import create_post_dict
 from utils import check_data_quality
 
@@ -22,10 +25,10 @@ minimum_frequency = 20
 maximum_frequency = 1024
 roll_off=0.4
 
-true_amplitude=1
+true_amplitude=1.0
 
 max_like = np.argmax(samples['log_likelihood'])
-true_parameters = samples.iloc[max_like].to_dict()
+max_like_parameters = samples.iloc[max_like].to_dict()
 
 # Using O2 data segment.
 start_segment = 1164556817
@@ -36,7 +39,7 @@ duration = 4
 psd_duration = 32
 detectors = ['H1', 'L1']
 
-for i in range(7, 100):
+for i in range(1):
 
     bad_data = True
     while bad_data:
@@ -54,76 +57,85 @@ for i in range(7, 100):
         if count == len(detectors):
             bad_data=False
 
+    
+    true_parameters = dict(mass_1=max_like_parameters['mass_1'],
+                           mass_2=max_like_parameters['mass_2'],
+                           luminosity_distance=max_like_parameters['luminosity_distance'],
+                           a_1=max_like_parameters['a_1'],
+                           a_2=max_like_parameters['a_2'], 
+                           tilt_1=max_like_parameters['tilt_1'], 
+                           phi_12=max_like_parameters['phi_12'], 
+                           tilt_2=max_like_parameters['tilt_2'], 
+                           phi_jl=max_like_parameters['phi_jl'], 
+                           theta_jn=max_like_parameters['theta_jn'], 
+                           phase=max_like_parameters['phase'],
+                           geocent_time=trigger_time,
+                           zenith=max_like_parameters['azimuth'],
+                           azimuth=max_like_parameters['azimuth'],
+                           psi=max_like_parameters['psi'],
+                           ra=max_like_parameters['ra'],
+                           dec=max_like_parameters['dec'])
 
     # Set up interferometers.
     ifo_list = bilby.gw.detector.InterferometerList([])
 
     for det in detectors:   # for loop to add info about detector into ifo_list
         ifo = bilby.gw.detector.get_empty_interferometer(det)
-        data = TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
+        # data = TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
 
 
-        # Resampling using lal as that was what was done in bilby_pipe.
-        lal_timeseries = data.to_lal()
-        lal.ResampleREAL8TimeSeries(
-            lal_timeseries, float(1/sampling_frequency)
-        )
-        data = TimeSeries(
-            lal_timeseries.data.data,
-            epoch=lal_timeseries.epoch,
-            dt=lal_timeseries.deltaT
-        )
+        # # Resampling using lal as that was what was done in bilby_pipe.
+        # lal_timeseries = data.to_lal()
+        # lal.ResampleREAL8TimeSeries(
+        #     lal_timeseries, float(1/sampling_frequency)
+        # )
+        # data = TimeSeries(
+        #     lal_timeseries.data.data,
+        #     epoch=lal_timeseries.epoch,
+        #     dt=lal_timeseries.deltaT
+        # )
 
-        # define some attributes in ifo
-        ifo.strain_data.roll_off=roll_off
-        ifo.maximum_frequency = maximum_frequency
-        ifo.minimum_frequency = minimum_frequency
-        ifo.strain_data.set_from_gwpy_timeseries(data)
+        # # define some attributes in ifo
+        # ifo.strain_data.roll_off=roll_off
+        # ifo.maximum_frequency = maximum_frequency
+        # ifo.minimum_frequency = minimum_frequency
+        # ifo.strain_data.set_from_gwpy_timeseries(data)
 
-        psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
+        # psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
 
-        # again, we resample the psd_data using lal.
-        psd_lal_timeseries = psd_data.to_lal()
-        lal.ResampleREAL8TimeSeries(
-            psd_lal_timeseries, float(1/sampling_frequency)
-        )
-        psd_data = TimeSeries(
-            psd_lal_timeseries.data.data,
-            epoch=psd_lal_timeseries.epoch,
-            dt=psd_lal_timeseries.deltaT
-        )
+        # # again, we resample the psd_data using lal.
+        # psd_lal_timeseries = psd_data.to_lal()
+        # lal.ResampleREAL8TimeSeries(
+        #     psd_lal_timeseries, float(1/sampling_frequency)
+        # )
+        # psd_data = TimeSeries(
+        #     psd_lal_timeseries.data.data,
+        #     epoch=psd_lal_timeseries.epoch,
+        #     dt=psd_lal_timeseries.deltaT
+        # )
 
-        psd_alpha = 2 * roll_off / duration                                         # psd_alpha might affect BF
-        psd = psd_data.psd(                                                         # this function might affect BF
-            fftlength=duration, overlap=0.5*duration, window=("tukey", psd_alpha), method="median"
-        )
+        # psd_alpha = 2 * roll_off / duration                                         # psd_alpha might affect BF
+        # psd = psd_data.psd(                                                         # this function might affect BF
+        #     fftlength=duration, overlap=0.5*duration, window=("tukey", psd_alpha), method="median"
+        # )
 
-        ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
-            frequency_array=psd.frequencies.value, psd_array=psd.value
-        )
+        # ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+        #     frequency_array=psd.frequencies.value, psd_array=psd.value
+        # )
+
+        # psd_array = np.column_stack((psd.frequencies.value, psd.value))
+        # np.savetxt(f'GW170818_injection_LIGO_data/{det}_psd_run{i+1}.dat', psd_array)
+
+        ifo.minimum_frequency = 20
 
         ifo_list.append(ifo)
 
     waveform_name = 'IMRPhenomXPHM'
-
-    waveform_generator_osc = bilby.gw.waveform_generator.WaveformGenerator(
-        duration=duration,
-        sampling_frequency=sampling_frequency,
-        frequency_domain_source_model= bilby.gw.source.lal_binary_black_hole,
-        parameter_conversion = bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
-        waveform_arguments=dict(duration=duration,
-                                minimum_frequency=minimum_frequency,
-                                maximum_frequency=maximum_frequency,
-                                sampling_frequency=sampling_frequency,
-                                reference_frequency=reference_frequency,
-                                waveform_approximant=waveform_name,
-                                )
-
-        )
+    print('1')
     waveform_generator_full = bilby.gw.waveform_generator.WaveformGenerator(
             duration=duration,
             sampling_frequency=sampling_frequency,
-            frequency_domain_source_model= mem_freq_XPHM_v2,
+            frequency_domain_source_model= mem_freq_XPHM,
             parameter_conversion = bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
             waveform_arguments=dict(duration=duration,
                                     roll_off=roll_off,
@@ -131,16 +143,18 @@ for i in range(7, 100):
                                     maximum_frequency=maximum_frequency,
                                     sampling_frequency=sampling_frequency,
                                     reference_frequency=reference_frequency,
-                                    bilby_generator = waveform_generator_osc,
+                                    waveform_approximant = waveform_name,
                                     amplitude=true_amplitude))
 
+    print('2')
 
+    ifo_list.set_strain_data_from_zero_noise(sampling_frequency, duration, start_time)
     ifo_list.inject_signal(
     parameters=true_parameters, waveform_generator=waveform_generator_full
     )
-
+    print('3')
     ifo_list.save_data(outdir='/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/data', label=f'GW170818_a{true_amplitude}_run{i+1}')
 
-    # plt.figure()
-    # plt.plot(ifo.time_array, ifo.time_domain_strain)
-    # plt.savefig('plot_time_domain_data.png')
+    plt.figure()
+    plt.plot(ifo.time_array, ifo.time_domain_strain)
+    plt.savefig('plot_time_domain_data.png')
