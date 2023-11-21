@@ -2,6 +2,11 @@ import numpy as np
 from gwpy import segments
 import gwpy
 
+import sys
+sys.path.append("..")
+
+from utils import check_data_quality
+
 template = """
 outdir = injection{injection_number}
 label=GW170818_a1_{injection_number}
@@ -14,10 +19,6 @@ maximum-frequency=1024
 reference-frequency = 20
 tukey-roll-off=0.4
 resampling-method=lal
-psd-fractional-overlap=0.5
-post-trigger-duration=2.0
-
-trigger_time = {trigger_time}
 
 coherence-test = False
 

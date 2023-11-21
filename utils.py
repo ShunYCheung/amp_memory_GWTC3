@@ -5,6 +5,8 @@ Script for bunch of useful functions for reweighting code.
 import bilby
 import copy
 import numpy as np
+from gwpy import segments
+import gwpy
 
 
 def nfft(time_domain_strain, sampling_frequency):
@@ -58,4 +60,37 @@ def wrap_by_n_indices(shift, waveform):
         waveform[mode] = np.roll(waveform[mode], shift=shift)
     return waveform
 
+def check_data_quality(start, end, det):
+    channel_num = 1
+    quality_flag = (
+        f"{det}:ITF_SCIENCE:{channel_num}"
+        if det == "V1"
+        else f"{det}:DMT-SCIENCE:{channel_num}"
+    )
+    try:
+        flag = segments.DataQualityFlag.query(
+            quality_flag, gwpy.time.to_gps(start), gwpy.time.to_gps(end)
+        )
 
+        # compare active duration from quality flag and total duration
+        total_duration = end - start
+        active_duration = float(flag.livetime)
+        inactive_duration = total_duration - active_duration
+
+        # data is not good if there is any period when the IFO is inactive
+        if inactive_duration > 0:
+            data_is_good = False
+            print("Data quality check: FAILED. \n"
+                "{det} does not have quality data for "
+                "{inactive_duration}s out of {total_duration}s".format(
+                    det=det,
+                    inactive_duration=inactive_duration,
+                    total_duration=total_duration,
+                ))
+        else:
+            data_is_good = True
+            print("Data quality check: PASSED.")
+    except Exception as e:
+        print(f"Error in Data Quality Check: {e}.")
+        data_is_good = False
+    return data_is_good
