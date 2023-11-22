@@ -39,7 +39,7 @@ duration = 4
 psd_duration = 32
 detectors = ['H1', 'L1']
 
-for i in range(1):
+for i in range(100):
 
     bad_data = True
     while bad_data:
@@ -79,59 +79,92 @@ for i in range(1):
     # Set up interferometers.
     ifo_list = bilby.gw.detector.InterferometerList([])
 
+    logger = bilby.core.utils.logger
+
     for det in detectors:   # for loop to add info about detector into ifo_list
         ifo = bilby.gw.detector.get_empty_interferometer(det)
-        # data = TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
 
-
-        # # Resampling using lal as that was what was done in bilby_pipe.
-        # lal_timeseries = data.to_lal()
-        # lal.ResampleREAL8TimeSeries(
-        #     lal_timeseries, float(1/sampling_frequency)
-        # )
-        # data = TimeSeries(
-        #     lal_timeseries.data.data,
-        #     epoch=lal_timeseries.epoch,
-        #     dt=lal_timeseries.deltaT
+        # channel_type = 'DCH-CLEAN_STRAIN_C02'
+        # channel = f"{det}:{channel_type}"
+        
+        # kwargs = dict(
+        #     start=start_time,
+        #     end=end_time,
+        #     verbose=False,
+        #     allow_tape=True,
         # )
 
-        # # define some attributes in ifo
-        # ifo.strain_data.roll_off=roll_off
-        # ifo.maximum_frequency = maximum_frequency
-        # ifo.minimum_frequency = minimum_frequency
-        # ifo.strain_data.set_from_gwpy_timeseries(data)
-
-        # psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
-
-        # # again, we resample the psd_data using lal.
-        # psd_lal_timeseries = psd_data.to_lal()
-        # lal.ResampleREAL8TimeSeries(
-        #     psd_lal_timeseries, float(1/sampling_frequency)
-        # )
-        # psd_data = TimeSeries(
-        #     psd_lal_timeseries.data.data,
-        #     epoch=psd_lal_timeseries.epoch,
-        #     dt=psd_lal_timeseries.deltaT
+        # type_kwargs = dict(
+        #     dtype="float64",
+        #     subok=True,
+        #     copy=False,
         # )
 
-        # psd_alpha = 2 * roll_off / duration                                         # psd_alpha might affect BF
-        # psd = psd_data.psd(                                                         # this function might affect BF
-        #     fftlength=duration, overlap=0.5*duration, window=("tukey", psd_alpha), method="median"
+        logger.info("Downloading analysis data for ifo {}".format(det))
+
+        # data = TimeSeries.get(channel, **kwargs).astype(
+        #         **type_kwargs)
+
+        data = TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
+
+        # Resampling using lal as that was what was done in bilby_pipe.
+        lal_timeseries = data.to_lal()
+        lal.ResampleREAL8TimeSeries(
+            lal_timeseries, float(1/sampling_frequency)
+        )
+        data = TimeSeries(
+            lal_timeseries.data.data,
+            epoch=lal_timeseries.epoch,
+            dt=lal_timeseries.deltaT
+        )
+
+        # define some attributes in ifo
+        ifo.strain_data.roll_off=roll_off
+        ifo.maximum_frequency = maximum_frequency
+        ifo.minimum_frequency = minimum_frequency
+        ifo.strain_data.set_from_gwpy_timeseries(data)
+
+        logger.info("Downloading psd data for ifo {}".format(det))
+
+        psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
+
+        # psd_kwargs = dict(
+        #     start=psd_start_time,
+        #     end=psd_end_time,
+        #     verbose=False,
+        #     allow_tape=True,
         # )
 
-        # ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
-        #     frequency_array=psd.frequencies.value, psd_array=psd.value
-        # )
+        # psd_data = TimeSeries.get(channel, **psd_kwargs).astype(
+        #         **type_kwargs)
+        
+        # again, we resample the psd_data using lal.
+        psd_lal_timeseries = psd_data.to_lal()
+        lal.ResampleREAL8TimeSeries(
+            psd_lal_timeseries, float(1/sampling_frequency)
+        )
+        psd_data = TimeSeries(
+            psd_lal_timeseries.data.data,
+            epoch=psd_lal_timeseries.epoch,
+            dt=psd_lal_timeseries.deltaT
+        )
 
-        # psd_array = np.column_stack((psd.frequencies.value, psd.value))
-        # np.savetxt(f'GW170818_injection_LIGO_data/{det}_psd_run{i+1}.dat', psd_array)
+        psd_alpha = 2 * roll_off / duration                                         # psd_alpha might affect BF
+        psd = psd_data.psd(                                                         # this function might affect BF
+            fftlength=duration, overlap=0.5*duration, window=("tukey", psd_alpha), method="median"
+        )
 
-        ifo.minimum_frequency = 20
+        ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+            frequency_array=psd.frequencies.value, psd_array=psd.value
+        )
+
+        psd_array = np.column_stack((psd.frequencies.value, psd.value))
+        np.savetxt(f'GW170818_injection_LIGO_data/{det}_psd_run{i+1}.dat', psd_array)
 
         ifo_list.append(ifo)
 
     waveform_name = 'IMRPhenomXPHM'
-    print('1')
+
     waveform_generator_full = bilby.gw.waveform_generator.WaveformGenerator(
             duration=duration,
             sampling_frequency=sampling_frequency,
@@ -146,15 +179,13 @@ for i in range(1):
                                     waveform_approximant = waveform_name,
                                     amplitude=true_amplitude))
 
-    print('2')
 
-    ifo_list.set_strain_data_from_zero_noise(sampling_frequency, duration, start_time)
     ifo_list.inject_signal(
     parameters=true_parameters, waveform_generator=waveform_generator_full
     )
-    print('3')
+
     ifo_list.save_data(outdir='/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/data', label=f'GW170818_a{true_amplitude}_run{i+1}')
 
-    plt.figure()
-    plt.plot(ifo.time_array, ifo.time_domain_strain)
-    plt.savefig('plot_time_domain_data.png')
+    # plt.figure()
+    # plt.plot(ifo.time_array, ifo.time_domain_strain)
+    # plt.savefig('plot_time_domain_data.png')

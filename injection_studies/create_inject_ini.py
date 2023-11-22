@@ -19,7 +19,10 @@ maximum-frequency=1024
 reference-frequency = 20
 tukey-roll-off=0.4
 
-psd-dict={{H1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/H1_psd_run{injection_number}.dat,L1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/L1_psd_run{injection_number}.dat}}
+channel-dict={{H1:DCH-CLEAN_STRAIN_C02, L1:DCH-CLEAN_STRAIN_C02}}
+
+trigger-time={trigger_time}
+post-trigger-duration = 2
 
 coherence-test = False
 
@@ -32,7 +35,7 @@ jitter-time=True
 time-reference = geocent
 reference-frame = H1L1
 
-prior-file=injection1.prior
+prior-file=priors/injection1.prior
 
 sampler = dynesty
 nact = 5
@@ -52,7 +55,7 @@ waveform-generator=bilby.gw.waveform_generator.WaveformGenerator
 
 injection=True
 injection-dict=None
-injection-file={{H1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/H1_GW170818_a1_run{injection_number}_frequency_domain_data.dat, L1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/L1_GW170818_a1_run{injection_number}_frequency_domain_data.dat}}
+injection-file=L1_GW170818_osc_mem_a1_waveform_frequency_domain_data.dat
 injection-numbers=None
 injection-waveform-approximant=None
 injection-waveform-arguments=None
@@ -69,7 +72,64 @@ mem-per-cpu = 800
 
 """
 
-print("""{H1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/H1_GW170818_a1_frequency_domain_data.dat, L1:/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/L1_GW170818_a1_frequency_domain_data.dat}""")
+template2 = """
+outdir = injection{injection_number}
+label=GW170818_a1_{injection_number}
+overwrite-outdir=False
+detectors = [H1, L1]
+duration = 4
+sampling-frequency=2048
+minimum-frequency=20
+maximum-frequency=1024
+reference-frequency = 20
+tukey-roll-off=0.4
+
+channel-dict={{H1:DCH-CLEAN_STRAIN_C02, L1:DCH-CLEAN_STRAIN_C02}}
+
+trigger-time={trigger_time}
+post-trigger-duration = 2
+
+coherence-test = False
+
+deltaT = 0.2
+time-marginalization=True
+distance-marginalization=True
+phase-marginalization=False
+distance-marginalization-lookup-table = TD.npz
+jitter-time=True
+time-reference = geocent
+reference-frame = H1L1
+
+prior-file=priors/injection1.prior
+
+sampler = dynesty
+sampler-kwargs = {{nlive: 2000, sample: rwalk, walks=100, n_check_point=2000, nact=10, resume=True}}
+
+request-cpus = 16
+request-memory = 50
+request-disk = 50
+accounting = ligo.dev.o4.cbc.waveforms.bilby
+
+disable-hdf5-locking = True
+
+waveform-approximant=IMRPhenomXPHM
+likelihood-type=GravitationalWaveTransient
+waveform-generator=bilby.gw.waveform_generator.WaveformGenerator
+
+################################################################################
+## Injection arguments
+################################################################################
+
+injection=True
+injection-dict=None
+injection-file=None
+injection-numbers=None
+injection-waveform-approximant=None
+injection-waveform-arguments={{'waveform_approximant':'IMRPhenomXPHM', 'amplitude'=1.0, 'roll_off'=0.4}}
+injection-frequency-domain-source-model = mem_freq_XPHM
+
+"""
+
 
 def check_data_quality(start, end, det):
     channel_num = 1
@@ -117,7 +177,7 @@ detectors = ['H1', 'L1']
 
 for i in range(1):
     number = i + 1
-    filename = f'GW170818_injection_LIGO_data/inject_GW170818_mem_A1_run{number}.ini'
+    filename = f'GW170818_injection_LIGO_data/inject_GW170818_mem_A1_test_run{number}.ini'
     bad_data = True
     while bad_data:
         trigger_time = np.random.randint(start_segment, end_segment)
