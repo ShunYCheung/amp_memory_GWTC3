@@ -34,11 +34,11 @@ from scipy.signal import get_window
 from scipy.signal.windows import tukey
 from scipy.special import logsumexp
 
-from waveforms import mem_freq_XPHM_v2, mem_freq_XPHM_only
+from waveforms import mem_freq_XPHM, mem_freq_XPHM_only
 
 
 
-def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, psds = None, calibration=None, n_parallel=2):
+def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, TD_path="TD.npz", psds = None, calibration=None, n_parallel=2):
 
 
     logger = bilby.core.utils.logger
@@ -119,7 +119,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     waveform_generator_full = bilby.gw.waveform_generator.WaveformGenerator(
         duration=duration,
         sampling_frequency=sampling_frequency,
-        frequency_domain_source_model= mem_freq_XPHM_v2,
+        frequency_domain_source_model= mem_freq_XPHM,
         parameter_conversion = bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
         waveform_arguments=dict(duration=duration,
                                 roll_off=roll_off,
@@ -127,7 +127,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
                                 maximum_frequency=maximum_frequency,
                                 sampling_frequency=sampling_frequency,
                                 reference_frequency=reference_frequency,
-                                bilby_generator = waveform_generator_osc,
+                                waveform_approximant=waveform_name,
                                 amplitude=amplitude)
 
     )
@@ -168,7 +168,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_osc,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = 'TD.npz',
+        distance_marginalization_lookup_table = TD_path,
         jitter_time=jitter_time,
         priors = priors,
         reference_frame = args['reference_frame'],
@@ -180,7 +180,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         waveform_generator_full,
         time_marginalization = time_marginalization,
         distance_marginalization = distance_marginalization,
-        distance_marginalization_lookup_table = 'TD.npz',
+        distance_marginalization_lookup_table = TD_path,
         jitter_time=jitter_time,
         priors = priors2,
         reference_frame = args['reference_frame'],
@@ -385,7 +385,7 @@ def injection(injection_dict, duration, sampling_frequency, start_time, minimum_
     waveform_generator = bilby.gw.WaveformGenerator(
         duration=duration,
         sampling_frequency=sampling_frequency,
-        frequency_domain_source_model=mem_freq_XPHM_v2,
+        frequency_domain_source_model=mem_freq_XPHM,
         parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
         waveform_arguments=waveform_arguments,
     )
