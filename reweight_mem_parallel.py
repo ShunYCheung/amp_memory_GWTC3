@@ -312,23 +312,25 @@ def call_data_GWOSC(logger, args, calibration, samples, detectors, start_time, e
         logger.info("Downloading analysis data for ifo {}".format(det))
         ifo = bilby.gw.detector.get_empty_interferometer(det)
         
-        channel_type = args['channel_dict'][det]
-        channel = f"{det}:{channel_type}"
+        # channel_type = args['channel_dict'][det]
+        # channel = f"{det}:{channel_type}"
         
-        kwargs = dict(
-            start=start_time,
-            end=end_time,
-            verbose=False,
-            allow_tape=True,
-        )
+        # kwargs = dict(
+        #     start=start_time,
+        #     end=end_time,
+        #     verbose=False,
+        #     allow_tape=True,
+        # )
 
-        type_kwargs = dict(
-            dtype="float64",
-            subok=True,
-            copy=False,
-        )
-        data = gwpy.timeseries.TimeSeries.get(channel, **kwargs).astype(
-                **type_kwargs)
+        # type_kwargs = dict(
+        #     dtype="float64",
+        #     subok=True,
+        #     copy=False,
+        # )
+        # data = gwpy.timeseries.TimeSeries.get(channel, **kwargs).astype(
+        #         **type_kwargs)
+
+        data = gwpy.timeseries.Timeseries.fetch_open_data(det, start_time, end_time, sample_rate=4096)
         
         # Resampling timeseries to sampling_frequency using lal.
         lal_timeseries = data.to_lal()
