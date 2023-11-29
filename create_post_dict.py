@@ -225,8 +225,10 @@ def extract_relevant_info(meta, config):
         print('Error: Unable to find distance marginalization lookup table')
         lookup_table_path = None
     
-
-
+    # extract calibration model
+    calibration_model = config['calibration-model'][0]
+    spline_calibration_nodes = int(config['spline-calibration-nodes'][0])
+    
     # combine all into a dict
     args = dict(duration=duration,
                sampling_frequency=sampling_frequency,
@@ -235,10 +237,10 @@ def extract_relevant_info(meta, config):
                reference_frequency=reference_frequency,
                waveform_approximant=waveform_approximant,
                trigger_time = trigger_time,
-                detectors=detectors,
-                start_time = segment_start,
-                end_time=end_time,
-            post_trigger_duration=post_trigger_duration,
+               detectors=detectors,
+               start_time = segment_start,
+               end_time=end_time,
+               post_trigger_duration=post_trigger_duration,
                tukey_roll_off = tukey_roll_off,
                distance_marginalization=distance_marginalization,
                time_marginalization=time_marginalization,
@@ -246,7 +248,10 @@ def extract_relevant_info(meta, config):
                time_reference=time_reference,
                jitter_time=jitter_time,
                channel_dict=channel_dict,
-               distance_marginalization_lookup_table = lookup_table_path)
+               distance_marginalization_lookup_table = lookup_table_path,
+               calibration_model = calibration_model,
+               spline_calibration_nodes = spline_calibration_nodes)
+    
     return args
 
 

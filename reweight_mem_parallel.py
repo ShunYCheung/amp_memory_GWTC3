@@ -8,33 +8,23 @@ you wish to reweight.
 Author: Shun Yin Cheung
 
 """
-import sys
 
-import h5py
-import pandas as pd
 import numpy as np
 import bilby
-import gwmemory
 import lal
-import json
 import copy
 import pickle
-from tqdm import tqdm
+import psutil
+import os
 
 import gwpy
 from gwpy.timeseries import TimeSeries
-from gwosc.datasets import event_gps
 import matplotlib.pyplot as plt
 
-import utils
-from utils import get_alpha
 import multiprocessing as mp
-import functools
-from scipy.signal import get_window
-from scipy.signal.windows import tukey
 from scipy.special import logsumexp
 
-from waveforms import mem_freq_XPHM, mem_freq_XPHM_only
+from waveforms import mem_freq_XPHM
 
 
 
@@ -70,10 +60,6 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         post_trigger_duration = args['post_trigger_duration']
         trigger_time = args['trigger_time']
         
-        detectors = args['detectors']
-        if 'V1' in detectors:
-            detectors.remove('V1')
-        
         if args['trigger_time'] is not None:
             end_time = trigger_time + post_trigger_duration
             start_time = end_time - duration
@@ -84,17 +70,12 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
             print("Error: Trigger time or start time not extracted properly.")
             exit()
 
-        psd_duration = 32*duration # deprecated
-        psd_start_time = start_time - psd_duration # deprecated
-        psd_end_time = start_time # deprecated
+        # define psd parameters in case they don't have the psd in the result file.
+        psd_duration = 32*duration
+        psd_start_time = start_time - psd_duration
+        psd_end_time = start_time
         
-        ifo_list = call_data_GWOSC(logger, args, 
-                                   calibration, samples, detectors,
-                                   start_time, end_time, 
-                                   psd_start_time, psd_end_time, 
-                                   duration, sampling_frequency, 
-                                   roll_off, minimum_frequency, maximum_frequency,
-                                   psds_array=psds)
+        ifo_list = call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_time, psds_array=psds)
     
     waveform_name = args['waveform_approximant']
     
@@ -191,11 +172,11 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         = reweight_parallel(samples, proposal_likelihood, target_likelihood, priors2, n_parallel)
         
     print('Reweighting results')
+
     # Calulate the effective number of samples.
     neff = (np.sum(weights_list))**2 /np.sum(weights_sq_list)
-    print("effective no. of samples = {}".format(neff))
-
     efficiency = neff/len(weights_list)
+    print("effective no. of samples = {}".format(neff))
     print("{} percent efficiency".format(efficiency*100))
 
     # Calculate the Bayes factor
@@ -238,7 +219,7 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors):
 
         posterior = data.iloc[i].to_dict()
 
-        # make sures the values are float and not complex.
+        # make sure the values are float and not complex.
         if np.iscomplexobj(posterior['mass_2']):
             for keys in posterior:
                 posterior[keys] = float(np.real(posterior[keys]))
@@ -303,39 +284,21 @@ def reweight_parallel(samples, proposal_likelihood, target_likelihood, priors, n
 
 
 
-def call_data_GWOSC(logger, args, calibration, samples, detectors, start_time, end_time, psd_start_time, psd_end_time, duration, sampling_frequency, roll_off, minimum_frequency, maximum_frequency, psds_array=None, plot=False):
+def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_time, psds_array=None):
     
     ifo_list = bilby.gw.detector.InterferometerList([])
     
     # define interferometer objects
-    for det in detectors:   
+    for det in args['detectors']:   
         logger.info("Downloading analysis data for ifo {}".format(det))
         ifo = bilby.gw.detector.get_empty_interferometer(det)
-        
-        # channel_type = args['channel_dict'][det]
-        # channel = f"{det}:{channel_type}"
-        
-        # kwargs = dict(
-        #     start=start_time,
-        #     end=end_time,
-        #     verbose=False,
-        #     allow_tape=True,
-        # )
 
-        # type_kwargs = dict(
-        #     dtype="float64",
-        #     subok=True,
-        #     copy=False,
-        # )
-        # data = gwpy.timeseries.TimeSeries.get(channel, **kwargs).astype(
-        #         **type_kwargs)
-
-        data = gwpy.timeseries.Timeseries.fetch_open_data(det, start_time, end_time, sample_rate=4096)
+        data = gwpy.timeseries.TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
         
         # Resampling timeseries to sampling_frequency using lal.
         lal_timeseries = data.to_lal()
         lal.ResampleREAL8TimeSeries(
-            lal_timeseries, float(1/sampling_frequency)
+            lal_timeseries, float(1/args['sampling_frequency'])
         )
         data = TimeSeries(
             lal_timeseries.data.data,
@@ -344,9 +307,9 @@ def call_data_GWOSC(logger, args, calibration, samples, detectors, start_time, e
         )
     
         # define some attributes in ifo
-        ifo.strain_data.roll_off = roll_off
-        ifo.maximum_frequency = maximum_frequency
-        ifo.minimum_frequency = minimum_frequency
+        ifo.strain_data.roll_off = args['tukey_roll_off']
+        ifo.maximum_frequency = args['maximum_frequency']
+        ifo.minimum_frequency = args['minimum_frequency']
         
         # set data as the strain data
         ifo.strain_data.set_from_gwpy_timeseries(data)
@@ -359,14 +322,40 @@ def call_data_GWOSC(logger, args, calibration, samples, detectors, start_time, e
             )
         else:
             print('Error: PSD is missing!')
-            exit()
+            psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=4096)
+
+            lal_timeseries = data.to_lal()
+            lal.ResampleREAL8TimeSeries(
+                lal_timeseries, float(1/args['sampling_frequency'])
+            )
+            data = TimeSeries(
+                lal_timeseries.data.data,
+                epoch=lal_timeseries.epoch,
+                dt=lal_timeseries.deltaT
+            )
+
+            psd_alpha = 2 * args['roll_off'] / args['duration   ']                                      
+            psd = psd_data.psd(                                                       
+                fftlength=args['duration'], overlap=0.5*args['duration'], window=("tukey", psd_alpha), method="median"
+            )
+
+            ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+                frequency_array=psd.frequencies.value, psd_array=psd.value
+            )
+        
+        if args['calibration_model'] == 'CubicSpline':
+            ifo.calibration_model = bilby.gw.calibration.CubicSpline(f"recalib_{ifo.name}_",
+                    minimum_frequency=ifo.minimum_frequency,
+                    maximum_frequency=ifo.maximum_frequency,
+                    n_points=args['spline_calibration_nodes'])
 
         ifo_list.append(ifo)
 
     return ifo_list
 
+
 # function that injects a signal into the detectors.
-def injection(injection_dict, duration, sampling_frequency, start_time, minimum_frequency, amplitude):
+def injection(injection_dict, duration: float, sampling_frequency, start_time, minimum_frequency, amplitude):
 
 
     # Set up interferometers.

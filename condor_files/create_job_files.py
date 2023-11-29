@@ -34,7 +34,7 @@ def make_sh_files(args, sh_filename):
     number = args['number']
     cpus = args['cpus']
     bash_str = f"""#!/bin/bash
-python /home/shunyin.cheung/amp_memory_GWTC3/reweight_multi.py {cpus} {number} {amp}
+{command} {cpus} {number} {amp}
     """
     with open(sh_filename, 'w') as ff:
         ff.write(bash_str)
@@ -62,28 +62,33 @@ def make_dag_files(args, dag_filename):
 
 ###################################
 
+command = "python /home/shunyin.cheung/amp_memory_GWTC3/reweight_GWTC3.py"
+
 event_table = call_event_table()
-
-events_wanted = np.array(['GW170104', 'GW170818', 'GW170729', 'GW190413_052954', 'GW190426_190462', 'GW190521', 
-                          'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191127', 'GW191204_171526', 
-                          'GW200128', 'GW200129', 'GW200202', 'GW190728', 'GW190924'])
-
 
 events_remaining = []
 event_number = []
 
 for event_num, event in enumerate(event_table):
     event_name, file_path, trigger_time, durations, waveform, data =event
-    if event_name not in events_wanted:
-        events_remaining.append(event_name)
-        event_number.append(event_num)
+    events_remaining.append(event_name)
+    event_number.append(event_num)
 
 
 print('events remaining', events_remaining)
 print('no. of remaining events', len(events_remaining))
 
-amplitude = [200, 300, 400, 500, 600, 700, 800, 900, 1000]
+small_a = np.arange(0.1, 2, 0.1)
+mid_a = np.arange(2, 8, 1)
+large_a = np.arange(8, 64, 2)
+e_large_a = np.arange(80, 400, 20)
 
+completed = [0.5, 1, 2, 4, 8, 16, 32, 64, 100, 128, 200, 300, 400]
+
+combined = np.concatenate((small_a, mid_a, large_a, e_large_a))
+amplitude = np.setdiff1d(combined, completed)
+
+print(amplitude)
 
 for amp in amplitude:
     for j, label in enumerate(events_remaining):
@@ -99,7 +104,7 @@ for amp in amplitude:
         make_sh_files(args, sh_filename)
 
 condor_dir = "/home/shunyin.cheung/amp_memory_GWTC3/condor_files/sub_files"
-dag_filename = args['log_dir'] + "/condor_files/extend_remaining_a1100.submit"
+dag_filename = args['log_dir'] + "/condor_files/improve_resolution_GWTC3_a_posteriors.submit"
 make_dag_files(args, dag_filename)
 
     
