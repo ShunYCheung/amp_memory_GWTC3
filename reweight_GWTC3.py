@@ -2,7 +2,6 @@ from reweight_mem_parallel import reweight_mem_parallel
 from create_post_dict import create_post_dict, extract_relevant_info, process_bilby_result
 from event_table import call_event_table
 
-import json
 import bilby
 import sys
 import os
@@ -14,7 +13,7 @@ print(amplitude)
 
 
 if __name__ == '__main__':
-    event_name, file_path, trigger_time, duration, waveform, data_file = \
+    event_name, file_path, waveform, data_file = \
         call_event_table()[event_number]
     print(f"opening {file_path}")
     
@@ -37,12 +36,11 @@ if __name__ == '__main__':
                                         samples_dict, 
                                         args,
                                         priors_dict,
-                                        "/home/shunyin.cheung/amp_memory_GWTC3/run2/{}".format(event_name),
+                                        "/home/shunyin.cheung/amp_memory_GWTC3/run3/{}".format(event_name),
                                         "weights_{}".format(event_name), 
                                         amplitude = amplitude,
                                         data_file=data_file,
                                         psds = psds,
-                                        calibration = None,
                                         n_parallel=cpus)
         
         

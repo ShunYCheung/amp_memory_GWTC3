@@ -14,25 +14,27 @@ import bilby
 import lal
 import copy
 import pickle
-import psutil
-import os
-
 import gwpy
 from gwpy.timeseries import TimeSeries
 import matplotlib.pyplot as plt
-
 import multiprocessing as mp
 from scipy.special import logsumexp
 
 from waveforms import mem_freq_XPHM
 
+# profiling modules
+import psutil
+import os
+from pympler import asizeof
+from pympler import muppy
+from pympler import summary
 
 
-def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, TD_path="TD.npz", psds = None, calibration=None, n_parallel=2):
+def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, TD_path="TD.npz", psds = None, n_parallel=2):
 
 
     logger = bilby.core.utils.logger
-    
+
     # adds in detectors and the specs for the detectors. 
     if data_file is not None:
         print("opening {}".format(data_file))
@@ -74,13 +76,14 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         psd_duration = 32*duration
         psd_start_time = start_time - psd_duration
         psd_end_time = start_time
-        
+
         ifo_list = call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_time, psds_array=psds)
     
     waveform_name = args['waveform_approximant']
     
     print('waveform used: ', waveform_name)
-    # test if bilby oscillatory waveform = gwmemory oscillatory waveform.
+
+    # define oscillatory waveform.
     waveform_generator_osc = bilby.gw.waveform_generator.WaveformGenerator(
         duration=duration,
         sampling_frequency=sampling_frequency,
@@ -168,8 +171,10 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         time_reference = args['time_reference'],
     )
 
+
     weights_list, weights_sq_list, proposal_likelihood_list, target_likelihood_list, ln_weights_list \
-        = reweight_parallel(samples, proposal_likelihood, target_likelihood, priors2, n_parallel)
+        = reweight_parallel(samples, proposal_likelihood, target_likelihood, priors2, 
+                            time_marginalization, distance_marginalization, n_parallel)
         
     print('Reweighting results')
 
@@ -202,7 +207,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     
 
     
-def reweighting(data, proposal_likelihood, target_likelihood, priors):
+def reweighting(data, proposal_likelihood, target_likelihood, priors, time_marginalization, distance_marginalization):
     logger = bilby.core.utils.logger
     ln_weights_list=[]
     weights_list = []
@@ -210,8 +215,13 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors):
     proposal_likelihood_list = []
     target_likelihood_list = []
     
-    reference_dict = {'geocent_time': priors['geocent_time'],
-                 'luminosity_distance': priors['luminosity_distance']}
+    # if marginalization is turned on, define the reference values.
+    reference_dict = {}
+    if time_marginalization:
+        reference_dict.update({'geocent_time': priors['geocent_time']}),
+    if distance_marginalization:
+        reference_dict.update({'luminosity_distance': priors['luminosity_distance']})
+
     
     length = data.shape[0]
     
@@ -252,13 +262,15 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors):
         target_likelihood_list.append(target_likelihood_values)
         ln_weights_list.append(ln_weights)
 
+
     return weights_list, weights_sq_list, proposal_likelihood_list, target_likelihood_list, ln_weights_list
 
 
 
-def reweight_parallel(samples, proposal_likelihood, target_likelihood, priors, n_parallel=2):
+def reweight_parallel(samples, proposal_likelihood, target_likelihood, priors, 
+                      time_marginalization, distance_marginalization, n_parallel=2):
     print("activate multiprocessing")
-    p = mp.Pool(n_parallel)
+    p = mp.Pool(n_parallel, maxtasksperchild=200)
 
     data=samples
     new_data = copy.deepcopy(data)
@@ -270,8 +282,8 @@ def reweight_parallel(samples, proposal_likelihood, target_likelihood, priors, n
         res = copy.deepcopy(posteriors[i])
         new_results.append(res)
  
-    iterable = [(new_result, proposal_likelihood, target_likelihood, priors) for new_result in new_results]
-
+    iterable = [(new_result, proposal_likelihood, target_likelihood, priors, time_marginalization, distance_marginalization) for new_result in new_results]
+    
     res = p.starmap(reweighting, iterable)
     
     p.close()
@@ -294,7 +306,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
         ifo = bilby.gw.detector.get_empty_interferometer(det)
 
         data = gwpy.timeseries.TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
-        
+
         # Resampling timeseries to sampling_frequency using lal.
         lal_timeseries = data.to_lal()
         lal.ResampleREAL8TimeSeries(
@@ -305,7 +317,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
             epoch=lal_timeseries.epoch,
             dt=lal_timeseries.deltaT
         )
-    
+
         # define some attributes in ifo
         ifo.strain_data.roll_off = args['tukey_roll_off']
         ifo.maximum_frequency = args['maximum_frequency']
@@ -313,7 +325,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
         
         # set data as the strain data
         ifo.strain_data.set_from_gwpy_timeseries(data)
-        
+
         # compute the psd
         if det in psds_array.keys():
             print("Using pre-computed psd from results file")
@@ -334,7 +346,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
                 dt=lal_timeseries.deltaT
             )
 
-            psd_alpha = 2 * args['roll_off'] / args['duration   ']                                      
+            psd_alpha = 2 * args['tukey_roll_off'] / args['duration']                                      
             psd = psd_data.psd(                                                       
                 fftlength=args['duration'], overlap=0.5*args['duration'], window=("tukey", psd_alpha), method="median"
             )
@@ -342,7 +354,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
             ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
                 frequency_array=psd.frequencies.value, psd_array=psd.value
             )
-        
+
         if args['calibration_model'] == 'CubicSpline':
             ifo.calibration_model = bilby.gw.calibration.CubicSpline(f"recalib_{ifo.name}_",
                     minimum_frequency=ifo.minimum_frequency,
