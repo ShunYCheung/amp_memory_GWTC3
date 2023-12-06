@@ -172,7 +172,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     )
 
 
-    weights_list, weights_sq_list, proposal_likelihood_list, target_likelihood_list, ln_weights_list \
+    weights_list, weights_sq_list, proposal_ln_likelihood_list, target_ln_likelihood_list, ln_weights_list \
         = reweight_parallel(samples, proposal_likelihood, target_likelihood, priors2, 
                             time_marginalization, distance_marginalization, n_parallel)
         
@@ -197,10 +197,10 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
                weights_list, 
                delimiter=",")
     np.savetxt(out_folder+"/{0}_a={1}_{2}_proposal_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
-               proposal_likelihood_list, 
+               proposal_ln_likelihood_list, 
                delimiter=",")
     np.savetxt(out_folder+"/{0}_a={1}_{2}_target_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
-               target_likelihood_list, 
+               target_ln_likelihood_list, 
                delimiter=",")
 
     return weights_list, bf
@@ -212,8 +212,8 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors, time_margi
     ln_weights_list=[]
     weights_list = []
     weights_sq_list = []
-    proposal_likelihood_list = []
-    target_likelihood_list = []
+    proposal_ln_likelihood_list = []
+    target_ln_likelihood_list = []
     
     # if marginalization is turned on, define the reference values.
     reference_dict = {}
@@ -241,29 +241,34 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors, time_margi
             logger.info("{:0.2f}".format(i / length * 100) + "%")
         
         if use_stored_likelihood:
-            proposal_likelihood_values = data['log_likelihood'].iloc[i]
+            proposal_ln_likelihood_value = data['log_likelihood'].iloc[i]
             
         else:
             proposal_likelihood.parameters.update(posterior)
             proposal_likelihood.parameters.update(reference_dict)
-            proposal_likelihood_values = proposal_likelihood.log_likelihood_ratio()
+            proposal_ln_likelihood_value = proposal_likelihood.log_likelihood_ratio()
+            
+            #print('difference between stored and calculated log likelihood')
+            #print(proposal_ln_likelihood_value - data['log_likelihood'].iloc[i])
+            
             
         target_likelihood.parameters.update(posterior)
         target_likelihood.parameters.update(reference_dict)
-        target_likelihood_values = target_likelihood.log_likelihood_ratio()
+        target_ln_likelihood_value = target_likelihood.log_likelihood_ratio()
         
-        ln_weights = target_likelihood_values-proposal_likelihood_values
+        ln_weights = target_ln_likelihood_value-proposal_ln_likelihood_value
+        # print(ln_weights)
         
-        weights = np.exp(target_likelihood_values-proposal_likelihood_values)
+        weights = np.exp(target_ln_likelihood_value-proposal_ln_likelihood_value)
         weights_sq = np.square(weights)
         weights_list.append(weights)
         weights_sq_list.append(weights_sq)
-        proposal_likelihood_list.append(proposal_likelihood_values)
-        target_likelihood_list.append(target_likelihood_values)
+        proposal_ln_likelihood_list.append(proposal_ln_likelihood_value)
+        target_ln_likelihood_list.append(target_ln_likelihood_value)
         ln_weights_list.append(ln_weights)
 
 
-    return weights_list, weights_sq_list, proposal_likelihood_list, target_likelihood_list, ln_weights_list
+    return weights_list, weights_sq_list, proposal_ln_likelihood_list, target_ln_likelihood_list, ln_weights_list
 
 
 

@@ -101,26 +101,7 @@ for i in range(1, 101):
     for det in detectors:   # for loop to add info about detector into ifo_list
         ifo = bilby.gw.detector.get_empty_interferometer(det)
 
-        # channel_type = 'DCH-CLEAN_STRAIN_C02'
-        # channel = f"{det}:{channel_type}"
-        
-        # kwargs = dict(
-        #     start=start_time,
-        #     end=end_time,
-        #     verbose=False,
-        #     allow_tape=True,
-        # )
-
-        # type_kwargs = dict(
-        #     dtype="float64",
-        #     subok=True,
-        #     copy=False,
-        # )
-
         logger.info("Downloading analysis data for ifo {}".format(det))
-
-        # data = TimeSeries.get(channel, **kwargs).astype(
-        #         **type_kwargs)
 
         data = TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=4096)
 
@@ -142,16 +123,6 @@ for i in range(1, 101):
         
         logger.info("Downloading psd data for ifo {}".format(det))
 
-        # psd_kwargs = dict(
-        #     start=psd_start_time,
-        #     end=psd_end_time,
-        #     verbose=False,
-        #     allow_tape=True,
-        # )
-
-        # psd_data = TimeSeries.get(channel, **psd_kwargs).astype(
-        #         **type_kwargs)
-
         psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=4096)
         
         # again, we resample the psd_data using lal.
@@ -165,8 +136,8 @@ for i in range(1, 101):
             dt=psd_lal_timeseries.deltaT
         )
 
-        psd_alpha = 2 * roll_off / duration                                         # psd_alpha might affect BF
-        psd = psd_data.psd(                                                         # this function might affect BF
+        psd_alpha = 2 * roll_off / duration                                        
+        psd = psd_data.psd(                                                       
             fftlength=duration, overlap=0.5*duration, window=("tukey", psd_alpha), method="median"
         )
 

@@ -40,19 +40,22 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
         bf = np.nansum(data)/len(data)
         eff = (np.nansum(data))**2 /np.nansum(np.square(data))/len(data)
 
-        amp_list = [1.0] + amp
+        amp_list = [1.0] + amp_list
         bf_list = [bf] + bf_list
         eff_list = [eff] + eff_list
+        
 
     # parallel sort both arrays so that np.trapz works properly.
     s_amp_list, s_bf_list, s_eff_list = (list(t) for t in zip(*sorted(zip(amp_list, bf_list, eff_list)))) 
 
     s_bf_list = np.array(s_bf_list)
     s_eff_list = np.array(s_eff_list)*100
+    
+    s_eff_list = np.nan_to_num(s_eff_list)
 
     bf_int = sp.interpolate.interp1d(s_amp_list, s_bf_list)
 
-    new_amp = np.linspace(np.min(s_amp_list), np.max(s_amp_list), 1000)
+    new_amp = np.linspace(np.min(s_amp_list), np.max(s_amp_list), 20000)
 
     new_bf = bf_int(new_amp)
     prob = new_bf/np.sum(new_bf)
@@ -77,12 +80,12 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
 
     plt.figure()
     plt.title(event_name)
-
+    plt.axvline(1, linestyle='dashed', color='black')
     plt.fill_between(new_amp, prob, color='cornflowerblue', alpha=0.5)
     plt.xlabel(f'A', fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
-    plt.xlim(0, np.max(new_amp))
+    plt.xlim(0, 10)
     plt.ylim(0, np.max(prob))
     plt.legend()
     plt.tight_layout()
@@ -95,9 +98,11 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
     np.savetxt(f"{outdir}/{event_name}/{event_name}_amplitude_posterior_results.csv", result, delimiter=',')
     try:
         csvdata = open(f'{outdir}/{event_name}/{event_name}_memory_snr_vs_amp.csv')
+        
     except:
         print(f'Error: memory snr file cannot be found for this event. Skip {event_name}')
         return None
+    
     memory_snr_table = np.loadtxt(csvdata)
     memory_amp = memory_snr_table[:,0]
     memory_snr = memory_snr_table[:,1]
@@ -118,9 +123,9 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
     axs[1].set_ylim(0, np.max(memory_snr))
     axs[2].set_ylim(0, np.max(s_eff_list))
     for ax in axs:
-        ax.set_xlim(0, np.max(s_amp_list))
+        ax.set_xlim(0, 10)
 
-    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot.png')
+    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot_301123.png')
 
     return None
 
@@ -161,19 +166,19 @@ def combine_posteriors(path_list, amplitudes, outdir):
     contour = t_contours[0]
     idx = np.argwhere(np.diff(np.sign(prob - contour))).flatten()
 
-    if len(idx) < 2:
-        idx = np.append(idx, 0)
-    elif len(idx) > 2:
-        print('Error: credible interval has more than two values.')
-        exit()
+    # if len(idx) < 2:
+    #     idx = np.append(idx, 0)
+    # elif len(idx) > 2:
+    #     print('Error: credible interval has more than two values.')
+    #     exit()
     
-    ci90 = sorted(new_amp[idx])
-    x = sorted(idx)
-    print('90 percent credible interval', ci90)
+    # ci90 = sorted(new_amp[idx])
+    # x = sorted(idx)
+    # print('90 percent credible interval', ci90)
 
     plt.figure()
     plt.fill_between(new_amp, prob, color='cornflowerblue', alpha=0.5)
-    plt.fill_between(new_amp[x[0]:x[1]], prob[x[0]:x[1]], color='cornflowerblue', alpha=0.9)
+    # plt.fill_between(new_amp[x[0]:x[1]], prob[x[0]:x[1]], color='cornflowerblue', alpha=0.9)
     plt.axvline(1, linestyle='dashed', color='black')
     plt.xlabel(f'A', fontsize=18)
     plt.xticks(fontsize=14)
@@ -181,8 +186,8 @@ def combine_posteriors(path_list, amplitudes, outdir):
     plt.xlim(0, 100)
     plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
-    plt.savefig(f'{outdir}/combined_amplitude_posterior.pdf')
-    plt.savefig(f'{outdir}/combined_amplitude_posterior.png')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_301123.pdf')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_301123.png')
 
     plt.figure()
     plt.fill_between(new_amp, prob, color='cornflowerblue', alpha=0.5)
@@ -192,20 +197,53 @@ def combine_posteriors(path_list, amplitudes, outdir):
     plt.xlim(0, 4)
     plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp.pdf')
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp.png')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp_301123.pdf')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp_301123.png')
 
-    
+
+small_a = np.arange(0.1, 2, 0.1)
+mid_a = np.arange(2, 8, 1)
+large_a = np.arange(8, 64, 2)
+e_large_a = np.arange(80, 400, 20)
+
+amplitudes = np.concatenate((small_a, mid_a, large_a, e_large_a))
+
+event_name = 'zero_noise'
+outdir = "injection_studies/posterior_results_simulated_noise"
+path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+make_results(event_name, path_list, outdir)
+
+event_name = 'gaussian_noise_run1'
+outdir = "injection_studies/posterior_results_simulated_noise"
+path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+make_results(event_name, path_list, outdir)
+
+event_name = 'gaussian_noise_run3'
+outdir = "injection_studies/posterior_results_simulated_noise"
+path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+make_results(event_name, path_list, outdir)
+
+event_name = 'gaussian_noise_run4'
+outdir = "injection_studies/posterior_results_simulated_noise"
+path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+make_results(event_name, path_list, outdir)
+
+
 #events_wanted = np.array(['GW170104','GW170729','GW190413_052954', 'GW190426_190642', 'GW190521', 'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191204_171526', 'GW200128', 'GW200129', 'GW200202'])
 # events_wanted = np.array(['GW190602'])
 # for i, event in enumerate(event_label[68:]):
 #     print(f'Event no. {i + 1}')
-        #outdir = 'results'
-    # path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/run2/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-#     make_results(path_list)
+#     outdir = 'results'
+#     path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/run2/{event}/weights_{event}_*_IMRPhenomXPHM.csv")
+#     make_results(event ,path_list, outdir)
 
+# combined_path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/results/*/*_results_301123.csv")
+# print(combined_path_list)
 #amplitudes = [0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0, 128.0]
-# combine_posteriors(event_label, amplitudes, outdir)
+
+# outdir = 'results'
+
+# combine_posteriors(combined_path_list, amplitudes, outdir)
 
 
 # for i in range(49, 101):
@@ -215,7 +253,7 @@ def combine_posteriors(path_list, amplitudes, outdir):
 #     path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
 #     make_results(event_name, path_list, outdir)
 
-path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/posterior_results/*/injection*_amplitude_posterior_results.csv")
-amplitudes =  np.concatenate((np.array([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]), np.arange(2, 100, 2) ,np.array([2, 4, 8, 16, 32, 64, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])))
-outdir = "injection_studies/posterior_results"
-combine_posteriors(path_list, amplitudes, outdir)
+# path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/posterior_results/*/injection*_amplitude_posterior_results.csv")
+# amplitudes =  np.concatenate((np.array([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]), np.arange(2, 100, 2) ,np.array([2, 4, 8, 16, 32, 64, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])))
+# outdir = "injection_studies/posterior_results"
+# combine_posteriors(path_list, amplitudes, outdir)

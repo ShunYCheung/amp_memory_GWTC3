@@ -256,23 +256,26 @@ def extract_relevant_info(meta, config):
 
 
 def process_bilby_result(meta):
-    
-    if '{' in meta['minimum_frequency']:
-        min_dict= ast.literal_eval(meta['minimum_frequency'])
-        minimum_frequency = np.min(
-                    [xx for xx in min_dict.values()]
-                ).item()
+    if meta['minimum_frequency'] is not None:
+        if '{' in meta['minimum_frequency']:
+            min_dict= ast.literal_eval(meta['minimum_frequency'])
+            minimum_frequency = np.min(
+                        [xx for xx in min_dict.values()]
+                    ).item()
 
-        meta['minimum_frequency'] = minimum_frequency
+            meta['minimum_frequency'] = minimum_frequency
+        meta['minimum_frequency'] = float(meta['minimum_frequency'])
     
-    if '{' in meta['maximum_frequency']:
-        max_dict = ast.literal_eval(meta['maximum_frequency'])
-        maximum_frequency = np.max(
-                    [xx for xx in max_dict.values()]
-                ).item()
+    if meta['maximum_frequency'] is not None:
+        if '{' in meta['maximum_frequency']:
+            max_dict = ast.literal_eval(meta['maximum_frequency'])
+            maximum_frequency = np.max(
+                        [xx for xx in max_dict.values()]
+                    ).item()
 
-        meta['maximum_frequency'] = maximum_frequency
-    
-    meta['minimum_frequency'] = float(meta['minimum_frequency'])
-    meta['maximum_frequency'] = float(meta['maximum_frequency'])
+            meta['maximum_frequency'] = maximum_frequency
+        
+        meta['maximum_frequency'] = float(meta['maximum_frequency'])
+    else:
+        meta['maximum_frequency'] = meta['sampling_frequency']/2
     return meta

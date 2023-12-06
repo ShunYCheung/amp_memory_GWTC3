@@ -1,9 +1,8 @@
 from reweight_mem_parallel import reweight_mem_parallel
-from create_post_dict import create_post_dict, extract_relevant_info, process_bilby_result
+from create_post_dict import process_bilby_result
 
 import bilby
 import sys
-import os
 import glob
 
 cpus = int(sys.argv[1])
@@ -50,5 +49,4 @@ if __name__ == '__main__':
                                         data_file=data_file,
                                         TD_path = TD_path,
                                         psds = psds,
-                                        calibration = None,
                                         n_parallel=cpus)
