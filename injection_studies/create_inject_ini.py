@@ -68,14 +68,14 @@ duration = 4
 detectors = ['H1', 'L1']
 
 
-for i in range(1):
+for i in range(100):
     number = i + 1
-    filename = f'GW170818_injection_LIGO_data/inject_GW170818_mem_A1_test_run{number}.ini'
+    filename = f'GW170818_injection_LIGO_data/inject_GW170818_mem_A1_run{number}.ini'
     trigger_time = np.loadtxt(f'GW170818_injection_LIGO_data/data/trigger_time_run{number}.txt')
     
     args = dict(
         injection_number = number,
-        trigger_time = trigger_time[0],
+        trigger_time = trigger_time,
     )
 
     print(args)

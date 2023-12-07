@@ -16,8 +16,8 @@ from waveforms import mem_freq_XPHM
 from create_post_dict import create_post_dict
 from utils import check_data_quality
 
-event_number = 8
-event_name, file_path, trigger_time, duration, waveform, data_file = call_event_table()[event_number]
+event_number = 0
+event_name, file_path, waveform, data_file = call_event_table()[event_number]
 samples, meta_dict, config_dict, priors, psds, calibration = create_post_dict(file_path, waveform)
 
 sampling_frequency = 2048
@@ -30,6 +30,8 @@ true_amplitude=1.0
 
 max_like = np.argmax(samples['log_likelihood'])
 max_like_parameters = samples.iloc[max_like].to_dict()
+del max_like_parameters['iota']
+max_like_parameters.update({'theta_jn': np.pi/2})       # maximise the memory signal
 
 # Using O2 data segment.
 start_segment = 1164556817
@@ -56,7 +58,7 @@ waveform_generator_full = bilby.gw.waveform_generator.WaveformGenerator(
                                 waveform_approximant = waveform_name,
                                 amplitude=true_amplitude))
 
-for i in range(1, 101):
+for i in range(20):
     bad_data = True
     while bad_data:
         trigger_time = np.random.randint(start_segment, end_segment)
@@ -73,7 +75,7 @@ for i in range(1, 101):
         if count == len(detectors):
             bad_data=False
 
-    np.savetxt(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/data/trigger_time_run{i}.txt', [trigger_time])
+    np.savetxt(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW150914_A1_injection_LIGO_data/data/trigger_time_run{i}.txt', [trigger_time])
 
     true_parameters = dict(mass_1=max_like_parameters['mass_1'],
                             mass_2=max_like_parameters['mass_2'],
@@ -87,8 +89,6 @@ for i in range(1, 101):
                             theta_jn=max_like_parameters['theta_jn'], 
                             phase=max_like_parameters['phase'],
                             geocent_time=trigger_time,
-                            zenith=max_like_parameters['azimuth'],
-                            azimuth=max_like_parameters['azimuth'],
                             psi=max_like_parameters['psi'],
                             ra=max_like_parameters['ra'],
                             dec=max_like_parameters['dec'])
@@ -146,14 +146,14 @@ for i in range(1, 101):
         )
 
         psd_array = np.column_stack((psd.frequencies.value, psd.value))
-        np.savetxt(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/data/{det}_psd_run{i}.dat', psd_array)
+        np.savetxt(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW150914_A1_injection_LIGO_data/data/{det}_psd_run{i}.dat', psd_array)
 
         data_and_signal, meta = bilby.gw.detector.inject_signal_into_gwpy_timeseries(data,
                                                                                         waveform_generator_full,
                                                                                         true_parameters,
                                                                                         det)
         
-        data_and_signal.write(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW170818_injection_LIGO_data/data/GW170818_mem_A1_{det}_run{i}.txt')
+        data_and_signal.write(f'/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/GW150914_A1_injection_LIGO_data/data/GW150914_mem_A1_{det}_run{i}.txt')
 
         ifo_list.append(ifo)
         
