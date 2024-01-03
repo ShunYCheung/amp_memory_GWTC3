@@ -6,10 +6,10 @@ import os
 import numpy as np
 
 analysis_template = """universe = vanilla 
-executable = {log_dir}/condor_files/sh_files/{label}_amp{amp}.sh
-log = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.log
-error = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.err
-output = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.out
+executable = {log_dir}/condor_files/sh_files/injections/{label}_amp{amp}.sh
+log = {log_dir}/output_condor/injections/log_file/run2_{label}_amp{amp}.log
+error = {log_dir}/output_condor/injections/err_file/{label}_amp{amp}.err
+output = {log_dir}/output_condor/injections/out_file/{label}_amp{amp}.out
 
 request_cpus = {cpus}
 request_disk = 8000
@@ -43,13 +43,14 @@ def make_sub_files(args, submit_filename):
 def make_dag_files(args, dag_filename):
     dag_str = (f"JOB 0 /home/shunyin.cheung/memory_GWTC3/condor_files/sub_files/dummy.sub\n")
     for i, amp in enumerate(amplitude):
-        for j, label in enumerate(events_remaining):
-            job_name = len(events_remaining)*i+j+1
+        for j in range(1, 101):
+            job_name = 100*i+j
+            label=f'injection_run{j}'
             dag_str += (
                 f"JOB {job_name} {os.path.join(condor_dir, f'{label}_amp{amp}.sub')}\n"
             )
     dag_str += ("PARENT 0 CHILD")
-    for j in range(1, len(events_remaining)*len(amplitude)+1):
+    for j in range(1, 100*len(amplitude)+1):
         dag_str += f" {j}"
     with open(dag_filename, 'w') as ff:
         ff.write(dag_str)
@@ -58,24 +59,33 @@ def make_dag_files(args, dag_filename):
 ###################################
 command = "python /home/shunyin.cheung/amp_memory_GWTC3/reweight_injection.py"
 
-amplitude = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2, 4, 8, 16, 32, 64, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+#amplitude = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2, 4, 8, 16, 32, 64, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000]
+#amplitude = np.arange(2, 100, 2)
 
+small_a = np.arange(0.1, 2, 0.1)
+mid_a = np.arange(2, 8, 1)
+large_a = np.arange(8, 64, 2)
+e_large_a = np.arange(80, 420, 20)
+ee_large_a = np.arange(400, 1100, 100)
+
+
+amplitude = np.concatenate((small_a, mid_a, large_a, e_large_a, ee_large_a))
 
 for amp in amplitude:
     for i in range (1, 101):
         args = dict(log_dir = "/home/shunyin.cheung/amp_memory_GWTC3",
-                label = f'injection_run{j}',
-                number = event_number[j],
+                label = f'injection_run{i}',
+                number = i,
                 amp = amp,
                 cpus = 4,
         ) 
-        sh_filename = args['log_dir'] + "/condor_files/sh_files/" + args['label'] + "_amp" + str(args['amp']) + ".sh"
-        submit_filename = args['log_dir'] + "/condor_files/sub_files/" + args['label'] + "_amp" + str(args['amp']) + ".sub"
+        sh_filename = args['log_dir'] + "/condor_files/sh_files/injections/" + args['label'] + "_amp" + str(args['amp']) + ".sh"
+        submit_filename = args['log_dir'] + "/condor_files/sub_files/injections/" + args['label'] + "_amp" + str(args['amp']) + ".sub"
         make_sub_files(args, submit_filename)
         make_sh_files(args, sh_filename)
 
-condor_dir = "/home/shunyin.cheung/amp_memory_GWTC3/condor_files/sub_files"
-dag_filename = args['log_dir'] + "/condor_files/extend_remaining_a1100.submit"
+condor_dir = "/home/shunyin.cheung/amp_memory_GWTC3/condor_files/sub_files/injections"
+dag_filename = args['log_dir'] + "/condor_files/reweight_100_injections_A2_A100.submit"
 make_dag_files(args, dag_filename)
 
     

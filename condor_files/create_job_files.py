@@ -12,12 +12,12 @@ from event_table import call_event_table
 
 analysis_template = """universe = vanilla 
 executable = {log_dir}/condor_files/sh_files/{label}_amp{amp}.sh
-log = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.log
-error = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.err
-output = {log_dir}/output_condor/{label}/run2_{label}_amp{amp}.out
+log = {log_dir}/output_condor/{label}/run3_{label}_amp{amp}.log
+error = {log_dir}/output_condor/{label}/run3_{label}_amp{amp}.err
+output = {log_dir}/output_condor/{label}/run3_{label}_amp{amp}.out
 
 request_cpus = {cpus}
-request_disk = 8000
+request_disk = 64000
 
 should_transfer_files = Yes
 when_to_transfer_output = ON_EXIT_OR_EVICT
@@ -81,14 +81,14 @@ print('no. of remaining events', len(events_remaining))
 small_a = np.arange(0.1, 2, 0.1)
 mid_a = np.arange(2, 8, 1)
 large_a = np.arange(8, 64, 2)
-e_large_a = np.arange(80, 400, 20)
+e_large_a = np.arange(80, 420, 20)
+ee_large_a = np.arange(400, 1100, 100)
 
-completed = [0.5, 1, 2, 4, 8, 16, 32, 64, 100, 128, 200, 300, 400]
 
-combined = np.concatenate((small_a, mid_a, large_a, e_large_a))
-amplitude = np.setdiff1d(combined, completed)
+amplitude = np.concatenate((small_a, mid_a, large_a, e_large_a, ee_large_a))
 
 print(amplitude)
+print('Number of data points:', len(amplitude))
 
 for amp in amplitude:
     for j, label in enumerate(events_remaining):
@@ -104,7 +104,7 @@ for amp in amplitude:
         make_sh_files(args, sh_filename)
 
 condor_dir = "/home/shunyin.cheung/amp_memory_GWTC3/condor_files/sub_files"
-dag_filename = args['log_dir'] + "/condor_files/improve_resolution_GWTC3_a_posteriors.submit"
+dag_filename = args['log_dir'] + "/condor_files/reweight_GWTC3_run3.submit"
 make_dag_files(args, dag_filename)
 
     

@@ -55,7 +55,7 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
 
     bf_int = sp.interpolate.interp1d(s_amp_list, s_bf_list)
 
-    new_amp = np.linspace(np.min(s_amp_list), np.max(s_amp_list), 20000)
+    new_amp = np.linspace(np.min(s_amp_list), np.max(s_amp_list), 100000)
 
     new_bf = bf_int(new_amp)
     prob = new_bf/np.sum(new_bf)
@@ -125,7 +125,7 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
     for ax in axs:
         ax.set_xlim(0, 10)
 
-    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot_301123.png')
+    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot.png')
 
     return None
 
@@ -186,8 +186,8 @@ def combine_posteriors(path_list, amplitudes, outdir):
     plt.xlim(0, 100)
     plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_301123.pdf')
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_301123.png')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior.pdf')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior.png')
 
     plt.figure()
     plt.fill_between(new_amp, prob, color='cornflowerblue', alpha=0.5)
@@ -197,8 +197,8 @@ def combine_posteriors(path_list, amplitudes, outdir):
     plt.xlim(0, 4)
     plt.ylim(0, np.max(prob)+0.01*np.max(prob))
     plt.tight_layout()
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp_301123.pdf')
-    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp_301123.png')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp.pdf')
+    plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp.png')
 
 
 small_a = np.arange(0.1, 2, 0.1)
@@ -208,26 +208,18 @@ e_large_a = np.arange(80, 400, 20)
 
 amplitudes = np.concatenate((small_a, mid_a, large_a, e_large_a))
 
-event_name = 'zero_noise'
-outdir = "injection_studies/posterior_results_simulated_noise"
-path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-make_results(event_name, path_list, outdir)
+# event_name = 'zero_noise'
+# outdir = "injection_studies/posterior_results_simulated_noise"
+# path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+# make_results(event_name, path_list, outdir)
 
-event_name = 'gaussian_noise_run1'
-outdir = "injection_studies/posterior_results_simulated_noise"
-path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-make_results(event_name, path_list, outdir)
+num_list = [1, 2, 4, 7, 13, 14, 19]
 
-event_name = 'gaussian_noise_run3'
-outdir = "injection_studies/posterior_results_simulated_noise"
-path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-make_results(event_name, path_list, outdir)
-
-event_name = 'gaussian_noise_run4'
-outdir = "injection_studies/posterior_results_simulated_noise"
-path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-make_results(event_name, path_list, outdir)
-
+for num in num_list:
+    event_name = f'run{num}'
+    outdir = "injection_studies/posterior_results_real_noise_GW150914"
+    path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_GW150914_real_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
+    make_results(event_name, path_list, outdir)
 
 #events_wanted = np.array(['GW170104','GW170729','GW190413_052954', 'GW190426_190642', 'GW190521', 'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191204_171526', 'GW200128', 'GW200129', 'GW200202'])
 # events_wanted = np.array(['GW190602'])

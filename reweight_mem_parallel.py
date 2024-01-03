@@ -19,6 +19,7 @@ from gwpy.timeseries import TimeSeries
 import matplotlib.pyplot as plt
 import multiprocessing as mp
 from scipy.special import logsumexp
+from scipy.signal.windows import tukey
 
 from waveforms import mem_freq_XPHM
 
@@ -258,6 +259,7 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors, time_margi
         
         ln_weights = target_ln_likelihood_value-proposal_ln_likelihood_value
         # print(ln_weights)
+        # print('target log likelihood', target_ln_likelihood_value)
         
         weights = np.exp(target_ln_likelihood_value-proposal_ln_likelihood_value)
         weights_sq = np.square(weights)
@@ -312,16 +314,24 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
 
         data = gwpy.timeseries.TimeSeries.fetch_open_data(det, start_time, end_time, sample_rate=16384)
 
+        alpha = 2 * args['tukey_roll_off'] / args['duration']     
+
         # Resampling timeseries to sampling_frequency using lal.
         lal_timeseries = data.to_lal()
         lal.ResampleREAL8TimeSeries(
             lal_timeseries, float(1/args['sampling_frequency'])
         )
         data = TimeSeries(
-            lal_timeseries.data.data,
+            lal_timeseries.data.data*tukey(len(lal_timeseries.data.data), alpha=alpha),
             epoch=lal_timeseries.epoch,
             dt=lal_timeseries.deltaT
         )
+
+        # data = TimeSeries(
+        #     lal_timeseries.data.data,
+        #     epoch=lal_timeseries.epoch,
+        #     dt=lal_timeseries.deltaT
+        # )
 
         # define some attributes in ifo
         ifo.strain_data.roll_off = args['tukey_roll_off']
@@ -338,17 +348,17 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
             frequency_array=psds_array[det][: ,0], psd_array=psds_array[det][:, 1]
             )
         else:
-            print('Error: PSD is missing!')
-            psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=4096)
+            print('PSD is missing from results file. Generating one.')
+            psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
 
-            lal_timeseries = data.to_lal()
+            psd_lal_timeseries = psd_data.to_lal()
             lal.ResampleREAL8TimeSeries(
                 lal_timeseries, float(1/args['sampling_frequency'])
             )
-            data = TimeSeries(
-                lal_timeseries.data.data,
-                epoch=lal_timeseries.epoch,
-                dt=lal_timeseries.deltaT
+            psd_data = TimeSeries(
+                psd_lal_timeseries.data.data,
+                epoch=psd_lal_timeseries.epoch,
+                dt=psd_lal_timeseries.deltaT
             )
 
             psd_alpha = 2 * args['tukey_roll_off'] / args['duration']                                      
@@ -371,40 +381,4 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
     return ifo_list
 
 
-# function that injects a signal into the detectors.
-def injection(injection_dict, duration: float, sampling_frequency, start_time, minimum_frequency, amplitude):
-
-
-    # Set up interferometers.
-    interferometers = bilby.gw.detector.InterferometerList(["H1", "L1"])
-    for interferometer in interferometers:
-        interferometer.minimum_frequency = 20
-    interferometers.set_strain_data_from_power_spectral_densities(
-        sampling_frequency=sampling_frequency, duration=duration, start_time=start_time
-    )
-    
-    waveform_arguments=dict(duration=duration,
-                                roll_off=0.2,
-                                minimum_frequency=minimum_frequency,
-                                sampling_frequency=sampling_frequency,
-                                amplitude=amplitude,
-                                psd = interferometers[0].power_spectral_density_array)
-
-    waveform_generator = bilby.gw.WaveformGenerator(
-        duration=duration,
-        sampling_frequency=sampling_frequency,
-        frequency_domain_source_model=mem_freq_XPHM,
-        parameter_conversion=bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
-        waveform_arguments=waveform_arguments,
-    )
-    
-    
-    #plt.loglog(interferometers[0].frequency_array, interferometers[0].power_spectral_density_array, label='psd')
-    #plt.savefig('fd_diagonistic.png')
-    interferometers.inject_signal(
-        parameters=injection_dict, waveform_generator=waveform_generator
-    )
-    return interferometers
-
-##############################################
 
