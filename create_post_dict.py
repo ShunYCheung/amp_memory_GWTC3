@@ -1,33 +1,42 @@
 import h5py
-from bilby.core.utils.io import recursively_load_dict_contents_from_group, decode_from_hdf5, decode_bilby_json
+from bilby.core.utils.io import recursively_load_dict_contents_from_group
 import pandas as pd
-from bilby.core.prior import Prior, PriorDict, DeltaFunction, ConditionalDeltaFunction
-import json
+from bilby.core.prior import PriorDict
 import ast
 import numpy as np
-import os
-import sys
 
 
-def create_post_dict(file_name, waveform):
-    
-    # open data and convert the <closed hdf5 group> into readabel data types.
+def create_post_dict(file_name, wf):
+    # open data and convert the <closed hdf5 group> into readable data types.
     with h5py.File(file_name, "r") as ff:
         data = recursively_load_dict_contents_from_group(ff, '/')
     
-    # access relevant info in the result file.
-    posterior_samples = pd.DataFrame(data[waveform]['posterior_samples'])
+    # access the right waveform in the result file.
+    for key in data.keys():
+        if wf in key:
+            waveform = key
+            continue
+    
+    # extract posterior
+    try:
+        posterior_samples = pd.DataFrame(data[waveform]['posterior_samples'])
+    except:
+        raise Exception('Waveform not valid')
+    
+    # extract meta data
     meta = data[waveform]['meta_data']['meta_data']
     
-    if 'config' in data[waveform]['config_file'].keys():
+    # extract config data
+    try:
         config = data[waveform]['config_file']['config']
-    else:
-        config = data[waveform]['config_file']
-        print('No analytic priors found. Create time and distance priors to marginalize over.')
-    psds = data[waveform]['psds']
-    calibration = data[waveform]['calibration_envelope']
+    except:
+        raise Exception('Cannot recognise file struture of the result file.')
     
-    if 'analytic' in data[waveform]['priors'].keys():
+    # extract psds
+    psds = data[waveform]['psds']
+    
+    # extract priors
+    try:
         priors = data[waveform]['priors']['analytic']
         # get rid of the annoying problem where all the prior entries are wrapped in a list.
         for key in list(priors.keys()):
@@ -35,65 +44,41 @@ def create_post_dict(file_name, waveform):
             priors[key] = val
 
         # complete some prior names so that bilby can recognise them and recover the appropriate function.
-        val = data[waveform]['priors']['analytic']['chirp_mass']
-        cl = val.split("(")
+        cl = priors['chirp_mass'].split("(")
         if cl[0] == "UniformInComponentsChirpMass":
             complete_cl = "bilby.gw.prior.UniformInComponentsChirpMass("
             cl[0] = complete_cl
             string = ''.join(cl)
-            data[waveform]['priors']['analytic']['chirp_mass']=string
-            #print(string)
+            priors['chirp_mass']=string
 
-        val = data[waveform]['priors']['analytic']['mass_ratio']
-        cl = val.split("(")
+        cl = priors['mass_ratio'].split("(")
         if cl[0] == "UniformInComponentsMassRatio":
             complete_cl = "bilby.gw.prior.UniformInComponentsMassRatio("
             cl[0] = complete_cl
             string = ''.join(cl)
-            data[waveform]['priors']['analytic']['mass_ratio']=string
-            #print(string)
-        val = data[waveform]['priors']['analytic']['mass_ratio']
-        cl = val.split("(")
-        if cl[0] == "UniformInComponentsMassRatio":
-            complete_cl = "bilby.gw.prior.UniformInComponentsMassRatio("
-            cl[0] = complete_cl
-            string = ''.join(cl)
-            data[waveform]['priors']['analytic']['mass_ratio']=string
-            #print(string)
+            priors['mass_ratio']=string
+       
         # use bilby to convert the dict of prior names into PriorDict.
-        priors = PriorDict(data[waveform]["priors"]['analytic'])
-    else:
-        print('No analytic priors found. Create time and distance priors to marginalize over.')
-        priors = dict()
-        priors['luminosity_distance'] = "PowerLaw(alpha=2, minimum=10, maximum=10000, name='luminosity_distance', latex_label='$d_L$', unit='Mpc', boundary=None)"
-        priors['geocent_time'] = "Uniform(minimum={0}, maximum={1}, name='geocent_time', latex_label='$t_c$', unit='$s$', boundary=None)".format(end_time-2-0.1, end_time-2+0.1)
-        priors = PriorDict(priors)
+        prior_dict = PriorDict(priors)
+    except:
+        raise Exception('No analytic priors found.')
 
-    return posterior_samples, meta, config, priors, psds, calibration
+    return posterior_samples, meta, config, prior_dict, psds
 
 
 def extract_relevant_info(meta, config):
     """
     I need a function to extract info as everybody stores the info in their result files differently.
     """
+
     # extract sampling frequency
-    if 'sampling_frequency' in meta.keys():
-        sampling_frequency = meta['sampling_frequency'][0]
-    elif 'srate' in meta.keys():
-        sampling_frequency = meta['srate'][0]
-    elif 'sample_rate' in meta.keys():
-        sampling_frequency = meta['sample_rate'][0]
-    elif 'sampling-frequency' in config.keys():
+    if 'sampling-frequency' in config.keys():
         sampling_frequency = float(config['sampling-frequency'][0])
     else:
         print("unable to extract the sampling_frequency")
     
     # extract duration
-    if 'duration' in meta.keys():
-        duration = meta['duration'][0]
-    elif 'segment_length' in meta.keys():
-        duration = meta['segment_length'][0]
-    elif 'duration' in config.keys():
+    if 'duration' in config.keys():
         duration = float(config['duration'][0])
     else:
         print("unable to extract duration")
@@ -119,8 +104,6 @@ def extract_relevant_info(meta, config):
     # extract reference frequency
     if 'reference-frequency' in config.keys():
         reference_frequency = float(config['reference-frequency'][0])
-    elif 'f_ref' in meta.keys():
-        reference_frequency = meta['f_ref'][0]
     else:
         print('unable to extract reference frequency')
     
@@ -206,24 +189,6 @@ def extract_relevant_info(meta, config):
         channel_dict = dict(res)
     else:
         print('Unable to extract channel dict.')
-
-    # extract path to distance lookup table
-    outdir= config['outdir'][0]
-    TD_name = config['distance-marginalization-lookup-table'][0]
-
-    outdir_split = outdir.split('/')
-    path_TD = ''
-    for i in range(len(outdir_split)-1):
-        path_TD += outdir_split[i]
-        path_TD += '/'
-
-    if os.path.isfile(path_TD + TD_name):
-        lookup_table_path = path_TD + TD_name
-    elif os.path.isfile(path_TD + "'TD.npz'.npz"):
-        lookup_table_path = path_TD + "'TD.npz'.npz"
-    else:
-        print('Error: Unable to find distance marginalization lookup table')
-        lookup_table_path = None
     
     # extract calibration model
     calibration_model = config['calibration-model'][0]
@@ -248,10 +213,8 @@ def extract_relevant_info(meta, config):
                time_reference=time_reference,
                jitter_time=jitter_time,
                channel_dict=channel_dict,
-               distance_marginalization_lookup_table = lookup_table_path,
                calibration_model = calibration_model,
                spline_calibration_nodes = spline_calibration_nodes)
-    
     return args
 
 

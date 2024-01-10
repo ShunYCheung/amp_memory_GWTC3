@@ -7,6 +7,8 @@ import copy
 import numpy as np
 from gwpy import segments
 import gwpy
+import matplotlib.pyplot as plt
+from bilby.core.utils.series import infft
 
 
 def nfft(time_domain_strain, sampling_frequency):
@@ -94,3 +96,104 @@ def check_data_quality(start, end, det):
         print(f"Error in Data Quality Check: {e}.")
         data_is_good = False
     return data_is_good
+
+
+def plot_fd_data_and_waveforms(ifo, osc_model, mem_model, full_model, parameters):
+
+    osc_fd_strain = osc_model.frequency_domain_strain(parameters)
+    mem_fd_strain = mem_model.frequency_domain_strain(parameters)
+    full_fd_strain = full_model.frequency_domain_strain(parameters)
+
+    osc_response = ifo.get_detector_response(osc_fd_strain, parameters)
+    mem_response = ifo.get_detector_response(mem_fd_strain, parameters)
+    full_response = ifo.get_detector_response(full_fd_strain, parameters)
+
+    fd_data = ifo.frequency_domain_strain
+    frequencies = ifo.frequency_array
+    det = ifo.name
+
+    plt.loglog(frequencies, np.abs(fd_data), label=f'{det} data')
+    plt.loglog(frequencies, np.abs(osc_response), label='osc waveform')
+    plt.loglog(frequencies, np.abs(mem_response), label='mem_waveform')
+    plt.loglog(frequencies, np.abs(full_response), label='osc+mem waveform')
+
+
+def fit_vs_amplitude(amplitudes, ifo, samples, source_model, waveform_arguments, trigger_time, outdir):
+
+    det = ifo.name
+
+    whitened = np.array(copy.copy(ifo.whitened_frequency_domain_strain))
+    print(ifo.frequency_array)
+    print(whitened[ifo.frequency_array>19.5])
+    whitened[ifo.frequency_array>300] = 0
+
+    td_strain = infft(whitened, sampling_frequency = 2048)
+
+    time = ifo.time_array
+
+    plt.figure()
+    plt.plot(time, td_strain, label=f'whitened {det} data')
+
+    max_like = np.argmax(samples['log_likelihood'])
+    posterior = samples.iloc[max_like].to_dict()
+
+    for amplitude in amplitudes:
+        waveform_arguments['amplitude'] = amplitude
+        waveform_generator = bilby.gw.waveform_generator.WaveformGenerator(
+            duration=ifo.duration,
+            sampling_frequency=ifo.sampling_frequency,
+            frequency_domain_source_model= source_model,
+            parameter_conversion = bilby.gw.conversion.convert_to_lal_binary_black_hole_parameters,
+            waveform_arguments=waveform_arguments,
+
+        )
+
+        frequency_domain_strain = ifo.get_detector_response(waveform_generator.frequency_domain_strain(posterior), 
+                                                                        posterior)
+
+        fd_strain = frequency_domain_strain/ifo.power_spectral_density_array**0.5
+        time_domain_strain= bilby.core.utils.series.infft(fd_strain, sampling_frequency=2048)
+
+        plt.plot(time, time_domain_strain, label=f'A = {amplitude}')
+
+    plt.xlim(trigger_time-0.1, trigger_time+0.1)
+    plt.xlabel('time (s)')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outdir+f'data_with_full_waveform_different_A.png')
+
+
+def check_template_fit(amplitude, ifo, samples, waveform_generator, trigger_time, outdir):
+    from bilby.core.utils.series import infft
+    import matplotlib.pyplot as plt
+
+    det = ifo.name
+
+    whitened = np.array(copy.copy(ifo.whitened_frequency_domain_strain))
+    whitened[ifo.frequency_array>300] = 0
+
+    td_strain = infft(whitened, sampling_frequency = 2048)
+
+    time = ifo.time_array
+
+    max_like = np.argmax(samples['log_likelihood'])
+    posterior = samples.iloc[max_like].to_dict()
+
+    frequency_domain_strain = ifo.get_detector_response(waveform_generator.frequency_domain_strain(posterior), 
+                                                                    posterior)
+
+    fd_strain = frequency_domain_strain/ifo.power_spectral_density_array**0.5
+    time_domain_strain= bilby.core.utils.series.infft(fd_strain, sampling_frequency=2048)
+
+    #time_array = waveform_generator.time_array
+    print(time_domain_strain)
+
+    plt.figure()
+    plt.title(f'Amplitude = {amplitude}')
+    plt.plot(time, td_strain, label=f'whitened {det} data')
+    plt.plot(time, time_domain_strain, label='full waveform')
+    plt.xlim(trigger_time-0.1, trigger_time+0.1)
+    plt.xlabel('time (s)')
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(outdir+f'amplitude{amplitude}_template_fit_on_whitened_data_{det}_sample48.png')
