@@ -81,7 +81,6 @@ def check_data_quality(start, end, det):
 
         # data is not good if there is any period when the IFO is inactive
         if inactive_duration > 0:
-            data_is_good = False
             print("Data quality check: FAILED. \n"
                 "{det} does not have quality data for "
                 "{inactive_duration}s out of {total_duration}s".format(
@@ -89,13 +88,22 @@ def check_data_quality(start, end, det):
                     inactive_duration=inactive_duration,
                     total_duration=total_duration,
                 ))
+            return False
         else:
-            data_is_good = True
-            print("Data quality check: PASSED.")
+            data_is_good = flag.isgood
+            if data_is_good:
+                print("Data quality check: PASSED.")
+            else:
+                print("Data quality check: FAILED. \n"
+                    "{det} ifo is not in a good state".format(
+                        det=det,
+                    ))
+            return data_is_good
+
     except Exception as e:
         print(f"Error in Data Quality Check: {e}.")
-        data_is_good = False
-    return data_is_good
+        return False
+    
 
 
 def plot_fd_data_and_waveforms(ifo, osc_model, mem_model, full_model, parameters):
@@ -113,6 +121,7 @@ def plot_fd_data_and_waveforms(ifo, osc_model, mem_model, full_model, parameters
     det = ifo.name
 
     plt.loglog(frequencies, np.abs(fd_data), label=f'{det} data')
+    plt.loglog(frequencies, np.abs(osc_response + mem_response), label='alt osc+mem')
     plt.loglog(frequencies, np.abs(osc_response), label='osc waveform')
     plt.loglog(frequencies, np.abs(mem_response), label='mem_waveform')
     plt.loglog(frequencies, np.abs(full_response), label='osc+mem waveform')
@@ -170,14 +179,14 @@ def check_template_fit(amplitude, ifo, samples, waveform_generator, trigger_time
     det = ifo.name
 
     whitened = np.array(copy.copy(ifo.whitened_frequency_domain_strain))
-    whitened[ifo.frequency_array>300] = 0
+    whitened[ifo.frequency_array>1000] = 0
 
     td_strain = infft(whitened, sampling_frequency = 2048)
 
     time = ifo.time_array
 
     max_like = np.argmax(samples['log_likelihood'])
-    posterior = samples.iloc[max_like].to_dict()
+    posterior = samples.iloc[48].to_dict()
 
     frequency_domain_strain = ifo.get_detector_response(waveform_generator.frequency_domain_strain(posterior), 
                                                                     posterior)
@@ -190,7 +199,7 @@ def check_template_fit(amplitude, ifo, samples, waveform_generator, trigger_time
 
     plt.figure()
     plt.title(f'Amplitude = {amplitude}')
-    plt.plot(time, td_strain, label=f'whitened {det} data')
+    plt.plot(time, ifo.time_domain_strain, label=f'{det} data')
     plt.plot(time, time_domain_strain, label='full waveform')
     plt.xlim(trigger_time-0.1, trigger_time+0.1)
     plt.xlabel('time (s)')

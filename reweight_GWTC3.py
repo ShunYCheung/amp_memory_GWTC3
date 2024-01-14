@@ -45,7 +45,8 @@ if __name__ == '__main__':
     # plt.xlim(0, max(result[:, 0]))
     # plt.savefig('tests/test_results/GW170818_amp_full_waveform_snr.png')
     print("reweighting {}".format(event_name))
-    weights, bf = reweight_mem_parallel(samples_dict, 
+    weights, bf = reweight_mem_parallel(event_name, 
+                                        samples_dict, 
                                         args,
                                         priors_dict,
                                         outdir + event_name,

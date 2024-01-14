@@ -24,10 +24,10 @@ from waveforms import mem_freq_XPHM, mem_freq_XPHM_only
 from utils import *
 
 
-def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, TD_path="TD.npz", psds = None, n_parallel=2):
+def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile_name_w, amplitude = 1.0, data_file=None, TD_path="TD.npz", psds = None, n_parallel=2):
 
     logger = bilby.core.utils.logger
-    _plot_fd_data_and_waveforms = False
+    _plot_fd_data_and_waveforms = True
     _check_template_fit = False
     _fit_vs_amplitude = False
     _calculate_likelihood = False
@@ -46,14 +46,16 @@ def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amp
 
         sampling_frequency = ifo_list.sampling_frequency
         maximum_frequency = args['maximum_frequency']
-        minimum_frequency = args['minimum_frequency']
+        minimum_frequency = 20#args['minimum_frequency']
+        print('minimum frequency = ', minimum_frequency)
         reference_frequency = args['reference_frequency']
         roll_off = args['tukey_roll_off']
         duration = args['duration']
     else:
         sampling_frequency = args['sampling_frequency']
         maximum_frequency = args['maximum_frequency']
-        minimum_frequency = args['minimum_frequency']
+        minimum_frequency = 20#args['minimum_frequency']
+        print('minimum frequency = ', minimum_frequency)
         reference_frequency = args['reference_frequency']
         roll_off = args['tukey_roll_off']
         duration = args['duration']
@@ -78,6 +80,12 @@ def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amp
         #args['detectors'] = ['L1']
 
         ifo_list = call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_time, psds_array=psds)
+        # print(f'minimum frequency = {minimum_frequency}')
+        # print(f'maximum frequency = {maximum_frequency}')
+        # plt.figure()
+        # plt.plot(ifo_list[0].frequency_array, ifo_list[0].frequency_mask)
+        # plt.xlabel('frequency')
+        # plt.savefig('tests/test_results/check_frequency_mask.png')
     
     waveform_name = args['waveform_approximant']
     
@@ -161,6 +169,17 @@ def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amp
                         waveform_arguments, 
                         trigger_time, 
                         '/home/shunyin.cheung/amp_memory_GWTC3/tests/test_results/')
+    
+    mem_strain = waveform_generator_mem.time_domain_strain(samples.iloc[58].to_dict())
+    osc_strain = waveform_generator_osc.time_domain_strain(samples.iloc[58].to_dict())
+    mem_total = mem_strain['plus'] - 1j* mem_strain['cross']
+    osc_total = osc_strain['plus'] - 1j*osc_strain['cross']
+    plt.figure()
+    #plt.plot(ifo_list[0].time_array, ifo_list[0].time_domain_strain, label='data')
+    plt.plot(ifo_list[0].time_array, mem_total, label='mem')
+    plt.plot(ifo_list[0].time_array, osc_total, label='osc')
+    plt.legend()
+    plt.savefig(f'tests/test_results/{event_name}_memory_vs_data_sample58.png')
 
 
 
@@ -234,14 +253,14 @@ def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amp
         print(f'network optimal snr A={amplitude} = {network_optimal_snr_full}')
 
     if _plot_fd_data_and_waveforms:
-        best_fit_params = samples.iloc[max_like].to_dict()
+        best_fit_params = samples.iloc[58].to_dict()
         plt.figure()
         plot_fd_data_and_waveforms(ifo_list[0], waveform_generator_osc, waveform_generator_mem, waveform_generator_full, best_fit_params)
         plt.xlabel('frequency (Hz)')
         plt.xlim(19, 1024)
-        plt.ylim(1e-28, 1e-21)
+        plt.ylim(1e-28, 5e-21)
         plt.legend()
-        plt.savefig(f'tests/test_results/GW170818_{ifo_list[0].name}_fd_data_and_waveforms_A{amplitude}.png')
+        plt.savefig(f'tests/test_results/{event_name}_{ifo_list[0].name}_fd_data_and_waveforms_A{amplitude}_sample58.png')
     
 
     samples = samples.astype('float64')
@@ -268,15 +287,15 @@ def reweight_mem_parallel(samples, args, priors, out_folder, outfile_name_w, amp
     
     
     # save weights, proposal and target likelihoods into a .txt file
-    np.savetxt(out_folder+"/{0}_a={1}_{2}.csv".format(outfile_name_w, amplitude, waveform_name), 
-               weights_list, 
-               delimiter=",")
-    np.savetxt(out_folder+"/{0}_a={1}_{2}_proposal_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
-               proposal_ln_likelihood_list, 
-               delimiter=",")
-    np.savetxt(out_folder+"/{0}_a={1}_{2}_target_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
-               target_ln_likelihood_list, 
-               delimiter=",")
+    # np.savetxt(out_folder+"/{0}_a={1}_{2}.csv".format(outfile_name_w, amplitude, waveform_name), 
+    #            weights_list, 
+    #            delimiter=",")
+    # np.savetxt(out_folder+"/{0}_a={1}_{2}_proposal_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
+    #            proposal_ln_likelihood_list, 
+    #            delimiter=",")
+    # np.savetxt(out_folder+"/{0}_a={1}_{2}_target_likelihood.csv".format(outfile_name_w, amplitude, waveform_name), 
+    #            target_ln_likelihood_list, 
+    #            delimiter=",")
 
     return weights_list, bf
     
@@ -299,8 +318,10 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors, time_margi
     
     length = data.shape[0]
 
-    for i in range(length):
-        posterior = data.iloc[i].to_dict()
+    for i in range(1):
+        posterior = data.iloc[48].to_dict()
+        for key in posterior.keys():
+            print(f'{key} = {posterior[key]}')
 
         use_stored_likelihood=False
         
@@ -320,7 +341,7 @@ def reweighting(data, proposal_likelihood, target_likelihood, priors, time_margi
         target_likelihood.parameters.update(posterior)
         target_likelihood.parameters.update(reference_dict)
         target_ln_likelihood_value = target_likelihood.log_likelihood_ratio()
-        print(target_ln_likelihood_value)
+        print('target ln likelihood', target_ln_likelihood_value)
         
         ln_weights = target_ln_likelihood_value-proposal_ln_likelihood_value
         

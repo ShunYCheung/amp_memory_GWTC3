@@ -2,13 +2,14 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
+from pathfinder import find_multiple_path
 
 
 event_label = ['GW150914', 'GW151012', 'GW151226', 'GW170104', 'GW170608', 'GW170729', 'GW170809', 'GW170814', 'GW170818', 'GW170823', 'GW190403', 'GW190408', 'GW190412', 'GW190413_134308', 'GW190413_052954', 'GW190421', 'GW190426_190642', 'GW190503', 'GW190512', 'GW190513', 'GW190514', 'GW190517', 'GW190519', 'GW190521', 'GW190521_074359', 'GW190527', 'GW190602', 'GW190620', 'GW190630', 'GW190701', 'GW190706', 'GW190707', 'GW190708', 'GW190719', 'GW190720', 'GW190725', 'GW190727', 'GW190728', 'GW190731', 'GW190803', 'GW190805', 'GW190814', 'GW190828_065509', 'GW190828_063405', 'GW190910', 'GW190915', 'GW190916', 'GW190917', 'GW190924', 'GW190925', 'GW190926', 
                    'GW190929', 'GW190930', 'GW191103', 'GW191105', 'GW191109', 'GW191113', 'GW191126', 'GW191127', 'GW191129', 'GW191204_171526', 'GW191204_110529', 'GW191215', 'GW191216', 'GW191219', 'GW191222', 'GW191230', 'GW200105', 'GW200112', 'GW200115', 'GW200128', 'GW200129', 'GW200202', 'GW200208_222617', 'GW200208_130117', 'GW200209', 'GW200210', 'GW200216', 'GW200219', 'GW200220_124850', 'GW200220_061928', 'GW200224', 'GW200225', 'GW200302', 'GW200306', 'GW200308', 'GW200311_115853', 'GW200316', 'GW200322']
 
 
-def make_results(event_name, path_list, outdir, eff_lower=0):
+def make_results(event_name, path_list, outdir, label):
     
     s_path_list = sorted(path_list)
     amp_list = []
@@ -21,7 +22,6 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
         bf = np.nansum(data)/len(data)
         eff = (np.nansum(data))**2 /np.nansum(np.square(data))/len(data)
 
-        #if eff > eff_lower:
         text = file_name.split('_IMR')
         text2 = text[0].split('=')
         amp = text2[1]
@@ -29,27 +29,16 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
         amp_list.append(float(amp))
         bf_list.append(bf)
         eff_list.append(eff)
-    if 1.0 not in amp_list:
-        try:
-            path = f"/home/shunyin.cheung/memory_GWTC3/run2/weights_{event_name}_IMRPhenomXPHM.csv"
-            data = np.genfromtxt(path)
-        except:
-            print(f'Error: data file of A=1 cannot be found. Skipping {event_name}')
-            return None
-
-        bf = np.nansum(data)/len(data)
-        eff = (np.nansum(data))**2 /np.nansum(np.square(data))/len(data)
-
-        amp_list = [1.0] + amp_list
-        bf_list = [bf] + bf_list
-        eff_list = [eff] + eff_list
         
 
     # parallel sort both arrays so that np.trapz works properly.
+    print(amp_list)
+    print(bf_list)
+    print(eff_list)
     s_amp_list, s_bf_list, s_eff_list = (list(t) for t in zip(*sorted(zip(amp_list, bf_list, eff_list)))) 
 
     s_bf_list = np.array(s_bf_list)
-    s_eff_list = np.array(s_eff_list)*100
+    s_eff_list = np.array(s_eff_list)
     
     s_eff_list = np.nan_to_num(s_eff_list)
 
@@ -85,17 +74,17 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
     plt.xlabel(f'A', fontsize=18)
     plt.xticks(fontsize=14)
     plt.yticks(fontsize=14)
-    plt.xlim(0, 10)
+    plt.xlim(0, max(new_amp))
     plt.ylim(0, np.max(prob))
     plt.legend()
     plt.tight_layout()
-    plt.savefig(f'{outdir}/{event_name}/{event_name}_amplitude_vs_posterior.pdf')
-    plt.savefig(f'{outdir}/{event_name}/{event_name}_amplitude_vs_posterior.png')
+    plt.savefig(f'{outdir}/{event_name}/{event_name}_amplitude_vs_posterior_{label}.pdf')
+    plt.savefig(f'{outdir}/{event_name}/{event_name}_amplitude_vs_posterior_{label}.png')
 
     s_amp_list = np.array(s_amp_list)
     s_bf_list = np.array(s_bf_list)
     result = np.stack((s_amp_list, s_bf_list), axis=1)
-    np.savetxt(f"{outdir}/{event_name}/{event_name}_amplitude_posterior_results.csv", result, delimiter=',')
+    np.savetxt(f"{outdir}/{event_name}/{event_name}_amplitude_posterior_results_{label}.csv", result, delimiter=',')
     try:
         csvdata = open(f'{outdir}/{event_name}/{event_name}_memory_snr_vs_amp.csv')
         
@@ -120,12 +109,12 @@ def make_results(event_name, path_list, outdir, eff_lower=0):
     axs[1].label_outer()
     axs[2].label_outer()
     axs[0].set_ylim(0, np.max(s_bf_list)+0.05*np.max(s_bf_list))
-    axs[1].set_ylim(0, np.max(memory_snr))
+    axs[1].set_ylim(0, memory_snr[memory_amp == max(new_amp)])
     axs[2].set_ylim(0, np.max(s_eff_list))
     for ax in axs:
-        ax.set_xlim(0, 10)
+        ax.set_xlim(0, max(new_amp))
 
-    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot.png')
+    plt.savefig(f'{outdir}/{event_name}/{event_name}_three_metric_plot_{label}.png')
 
     return None
 
@@ -201,51 +190,15 @@ def combine_posteriors(path_list, amplitudes, outdir):
     plt.savefig(f'{outdir}/combined_amplitude_posterior_low_amp.png')
 
 
-small_a = np.arange(0.1, 2, 0.1)
-mid_a = np.arange(2, 8, 1)
-large_a = np.arange(8, 64, 2)
-e_large_a = np.arange(80, 400, 20)
-
-amplitudes = np.concatenate((small_a, mid_a, large_a, e_large_a))
-
-# event_name = 'zero_noise'
-# outdir = "injection_studies/posterior_results_simulated_noise"
-# path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_simulated_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-# make_results(event_name, path_list, outdir)
-
-num_list = [1, 2, 4, 7, 13, 14, 19]
-
-for num in num_list:
-    event_name = f'run{num}'
-    outdir = "injection_studies/posterior_results_real_noise_GW150914"
-    path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results_GW150914_real_noise/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-    make_results(event_name, path_list, outdir)
-
-#events_wanted = np.array(['GW170104','GW170729','GW190413_052954', 'GW190426_190642', 'GW190521', 'GW190602', 'GW190720', 'GW191109', 'GW191127', 'GW191204_171526', 'GW200128', 'GW200129', 'GW200202'])
-# events_wanted = np.array(['GW190602'])
-# for i, event in enumerate(event_label[68:]):
-#     print(f'Event no. {i + 1}')
-#     outdir = 'results'
-#     path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/run2/{event}/weights_{event}_*_IMRPhenomXPHM.csv")
-#     make_results(event ,path_list, outdir)
-
-# combined_path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/results/*/*_results_301123.csv")
-# print(combined_path_list)
-#amplitudes = [0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 32.0, 64.0, 100.0, 128.0]
-
+# result_dir = 'run4/GW170818/*XPHM.csv'
 # outdir = 'results'
+# label = '080124'
+# path_list = find_multiple_path('GW170818', result_dir)
+# make_results('GW170818', path_list, outdir, label)
 
-# combine_posteriors(combined_path_list, amplitudes, outdir)
-
-
-# for i in range(49, 101):
-#     print(f'Injection no. {i}')
-#     event_name = f'injection{i}'
-#     outdir = "injection_studies/posterior_results"
-#     path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/reweighting_results/{event_name}/weights_{event_name}_*_IMRPhenomXPHM.csv")
-#     make_results(event_name, path_list, outdir)
-
-# path_list = glob.glob(f"/home/shunyin.cheung/amp_memory_GWTC3/injection_studies/posterior_results/*/injection*_amplitude_posterior_results.csv")
-# amplitudes =  np.concatenate((np.array([0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75]), np.arange(2, 100, 2) ,np.array([2, 4, 8, 16, 32, 64, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])))
-# outdir = "injection_studies/posterior_results"
-# combine_posteriors(path_list, amplitudes, outdir)
+for i in range(10):
+    result_dir = f'memory_only_run/run{i}/*XPHM.csv'
+    outdir = 'memory_only_run/results'
+    label='memory_burst_120124'
+    path_list = find_multiple_path(f'run{i}', result_dir)
+    make_results(f'run{i}', path_list, outdir, label)
