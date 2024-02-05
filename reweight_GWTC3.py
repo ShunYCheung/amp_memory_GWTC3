@@ -9,16 +9,17 @@ import sys
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-
-cpus = int(sys.argv[1])
-event_name = str(sys.argv[2])
-amplitude = float(sys.argv[3])
-outdir = str(sys.argv[4])
-waveform = 'IMRPhenomXPHM'
-print('Amplitude = ', amplitude)
+import copy
 
 
 if __name__ == '__main__':
+    cpus = int(sys.argv[1])
+    event_name = str(sys.argv[2])
+    amplitude = float(sys.argv[3])
+    outdir = str(sys.argv[4])
+    waveform = 'IMRPhenomXPHM'
+    print('Amplitude = ', amplitude)
+
     file_path, data_file = extract_files(event_name)
     print(f"opening {file_path}")
     
@@ -45,6 +46,7 @@ if __name__ == '__main__':
     # plt.xlim(0, max(result[:, 0]))
     # plt.savefig('tests/test_results/GW170818_amp_full_waveform_snr.png')
     print("reweighting {}".format(event_name))
+
     weights, bf = reweight_mem_parallel(event_name, 
                                         samples_dict, 
                                         args,
@@ -54,7 +56,8 @@ if __name__ == '__main__':
                                         amplitude = amplitude,
                                         data_file=data_file,
                                         psds = psds,
-                                        n_parallel=cpus)
+                                        n_parallel=cpus,)
+    
         
         
 

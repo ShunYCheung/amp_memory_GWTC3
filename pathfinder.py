@@ -12,7 +12,7 @@ def find_path(event, dir):
     """
     path_list = glob.glob(dir)
     s_path_list = sorted(path_list)
-    
+
     for path in s_path_list:
         if event in path:
             return path

@@ -16,7 +16,8 @@ def create_post_dict(file_name, wf):
         if wf in key:
             waveform = key
             continue
-    
+
+    posterior_samples = pd.DataFrame(data[waveform]['posterior_samples'])
     # extract posterior
     try:
         posterior_samples = pd.DataFrame(data[waveform]['posterior_samples'])
