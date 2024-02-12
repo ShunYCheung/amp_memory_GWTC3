@@ -8,6 +8,9 @@ you wish to reweight.
 Author: Shun Yin Cheung
 
 """
+import os
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+
 import glob
 import numpy as np
 import bilby
@@ -34,7 +37,8 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     _show_info = False
     _plot_modes = False
     _plot_modes_v2 = False
-    read_data = False
+    read_data = True
+    read_psd = False
 
     # adds in detectors and the specs for the detectors. 
     if data_file is not None:
@@ -86,33 +90,59 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
             # define interferometer objects
             for det in args['detectors']:   
                 data_path = glob.glob(f'/home/shunyin.cheung/amp_memory_GWTC3/data/{start_time}_{det}.txt')
-                psd_path = glob.glob(f'/home/shunyin.cheung/amp_memory_GWTC3/data/{start_time}_{det}_psd.dat')
                 print(f'calling data from {data_path}')
-                print(f'calling psd from {psd_path}')
                 logger.info("Downloading analysis data for ifo {}".format(det))
                 ifo = bilby.gw.detector.get_empty_interferometer(det)
                 data = TimeSeries.read(data_path[0])
                 ifo.strain_data.set_from_gwpy_timeseries(data)
-                
-                psd = np.genfromtxt(psd_path[0])
-                ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
-                frequency_array=psd[:, 0], psd_array=psd[:, 1]
-                )
+                if read_psd:
+                    psd_path = glob.glob(f'/home/shunyin.cheung/amp_memory_GWTC3/data/{start_time}_{det}_psd.dat')
+                    print(f'calling psd from {psd_path}')
+                    psd = np.genfromtxt(psd_path[0])
+                    ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+                    frequency_array=psd[:, 0], psd_array=psd[:, 1]
+                    )
+                else:
+                    try:
+                        print("Using pre-computed psd from results file")
+                        ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+                        frequency_array=psds[det][: ,0], psd_array=psds[det][:, 1]
+                        )
+                    except:
+                        print('PSD is missing from results file. Generating one.')
+                        psd_data = TimeSeries.fetch_open_data(det, psd_start_time, psd_end_time, sample_rate=16384)
 
-                ifo_list.append(ifo)
+                        psd_lal_timeseries = psd_data.to_lal()
+                        lal.ResampleREAL8TimeSeries(
+                            psd_lal_timeseries, float(1/args['sampling_frequency'])
+                        )
+                        psd_data = TimeSeries(
+                            psd_lal_timeseries.data.data,
+                            epoch=psd_lal_timeseries.epoch,
+                            dt=psd_lal_timeseries.deltaT
+                        )
+
+                        psd_alpha = 2 * args['tukey_roll_off'] / args['duration']                                      
+                        psd = psd_data.psd(                                                       
+                            fftlength=args['duration'], overlap=0.5*args['duration'], window=("tukey", psd_alpha), method="median"
+                        )
+
+                        ifo.power_spectral_density = bilby.gw.detector.PowerSpectralDensity(
+                            frequency_array=psd.frequencies.value, psd_array=psd.value
+                        )
+
+                    if args['calibration_model'] == 'CubicSpline':
+                        ifo.calibration_model = bilby.gw.calibration.CubicSpline(f"recalib_{ifo.name}_",
+                                minimum_frequency=ifo.minimum_frequency,
+                                maximum_frequency=ifo.maximum_frequency,
+                                n_points=args['spline_calibration_nodes'])
+                    ifo_list.append(ifo)
         else:
             ifo_list = call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_time, psds_array=psds)
 
     
     waveform_name = args['waveform_approximant']
-    # second_fmin = 160
-    # ifo_list2 = copy.copy(ifo_list)
-    # for ifo in ifo_list2:
-    #     ifo.minimum_frequency = second_fmin
     
-    # print('second ifo minimum frequency',ifo_list2[0].minimum_frequency)
-    # print('second ifo minimum frequency',ifo_list2[1].minimum_frequency)
-    # print('second ifo minimum frequency',ifo_list2[2].minimum_frequency)
     
     print('waveform used: ', waveform_name)
 
@@ -133,8 +163,6 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
     )
     
     # define oscillatory + memory model using gwmemory.
-
-
     waveform_generator_full = bilby.gw.waveform_generator.WaveformGenerator(
         duration=duration,
         sampling_frequency=sampling_frequency,
@@ -258,24 +286,6 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         plt.legend(loc='upper left')
         plt.savefig('tests/test_results/memory_modes_sample80_zoomed.png')
         exit()
-             
-    # mem_strain = waveform_generator_mem.time_domain_strain(samples.iloc[0].to_dict())
-    # mem_total = mem_strain['plus'] - 1j*mem_strain['cross']
-    # full_max = np.max(np.abs(mem_total))
-    # print(f'event: {event_name}, amplitude = {amplitude}, max_strain = {full_max}')
-    # exit()
-    # mem_strain = waveform_generator_mem.time_domain_strain(samples.iloc[s].to_dict())
-    # osc_strain = waveform_generator_osc.time_domain_strain(samples.iloc[s].to_dict())
-    # mem_total = mem_strain['plus'] - 1j* mem_strain['cross']
-    # osc_total = osc_strain['plus'] - 1j*osc_strain['cross']
-    # plt.figure()
-    #plt.plot(ifo_list[0].time_array, ifo_list[0].time_domain_strain, label='data')
-    # plt.plot(ifo_list[0].time_array, mem_total, label='mem')
-    # plt.plot(ifo_list[0].time_array, osc_total, label='osc')
-    # plt.xlim(-0.5, 0.5)
-    # plt.legend()
-    #plt.savefig(f'tests/test_results/{event_name}_memory_vs_data_sample{s}_zoomed.png')
-
 
 
     if isinstance(args['time_marginalization'], str):
@@ -288,7 +298,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         args['distance_marginalization'] = eval(args['distance_marginalization'])
     
     
-    priors2 = copy.copy(priors) # for some reason the priors change after putting it into the likelihood object. 
+    priors2 = copy.deepcopy(priors) # for some reason the priors change after putting it into the likelihood object. 
     # Hence, defining new ones for the second likelihood object.
 
     
@@ -315,7 +325,7 @@ def reweight_mem_parallel(event_name, samples, args, priors, out_folder, outfile
         reference_frame = args['reference_frame'],
         time_reference = args['time_reference'],
     )
-
+    
     if _calculate_likelihood:
         max_like = np.argmax(samples['log_likelihood'])
         target_likelihood.parameters.update(samples.iloc[max_like].to_dict())
@@ -556,7 +566,7 @@ def call_data_GWOSC(logger, args, start_time, end_time, psd_start_time, psd_end_
 
             psd_lal_timeseries = psd_data.to_lal()
             lal.ResampleREAL8TimeSeries(
-                lal_timeseries, float(1/args['sampling_frequency'])
+                psd_lal_timeseries, float(1/args['sampling_frequency'])
             )
             psd_data = TimeSeries(
                 psd_lal_timeseries.data.data,
